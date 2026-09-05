@@ -14,6 +14,11 @@ tokens/
 *.key
 *.p12
 
+# Device-specific configuration fragments
+codex/config.local.toml
+codex/mcp.local.json
+claude/settings.local.json
+
 # Machine-local Codex runtime data
 .codex-home/
 .codex/runtime/

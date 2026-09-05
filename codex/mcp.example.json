@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "filesystem-example": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${AI_WORKSPACE}/FinUnity"
+      ],
+      "env": {
+        "EXAMPLE_API_KEY": "${EXAMPLE_API_KEY}"
+      }
+    }
+  }
+}

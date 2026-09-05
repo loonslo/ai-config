@@ -1,8 +1,9 @@
 [CmdletBinding()]
 param()
 
+$ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$excluded = '\\.git\\|\\.env($|\\)|\\.local\\.|\\.codex-home\\|\\secrets\\'
+$excluded = '\\.git(\\|$)|\\.env($|\\)|\\.local\\.|\\.example\\.|\\.codex-home(\\|$)|\\secrets(\\|$)|\\credentials(\\|$)'
 $patterns = @(
     'sk-[A-Za-z0-9_-]{20,}',
     '(?i)(api[_-]?key|access[_-]?token|auth[_-]?token|secret)\s*[:=]\s*["''][^"'']{12,}["'']',
