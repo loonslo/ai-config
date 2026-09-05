@@ -1,0 +1,28 @@
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+*.local.toml
+*.local.json
+*.local.md
+secrets/
+credentials/
+auth.json
+token.json
+tokens/
+*.pem
+*.key
+*.p12
+
+# Machine-local Codex runtime data
+.codex-home/
+.codex/runtime/
+.codex/log/
+logs/
+tmp/
+
+# Common OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

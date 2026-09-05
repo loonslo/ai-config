@@ -1,0 +1,23 @@
+# Shared Codex defaults.
+# This file is a versioned template. It intentionally contains no secrets,
+# machine-specific paths, authentication tokens, session state, or plugins.
+# Apply it to %USERPROFILE%\.codex\config.toml only after reviewing the diff.
+
+# Keep approvals explicit on shared machines.
+approval_policy = "on-request"
+
+# Safer portable default for repository work.
+sandbox_mode = "workspace-write"
+
+# Prefer cached search results unless a task explicitly needs fresh browsing.
+web_search = "cached"
+
+# Use a balanced default; individual projects or devices may override it.
+model_reasoning_effort = "high"
+
+# Set a model only when it is intentionally standardized across devices.
+# model = "gpt-5.6-luna"
+
+[windows]
+# Recommended for native Windows Codex installations.
+sandbox = "elevated"
