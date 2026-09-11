@@ -1,0 +1,29 @@
+{
+  "device": "remote-device",
+  "state_dir": "~/.ai-sync/state",
+  "memory_repo": "~/ai-memory",
+  "codex": "~/.codex",
+  "claude": "~/.claude",
+  "codex_keys": [],
+  "codex_overrides": {},
+  "claude_keys": [],
+  "claude_overrides": {},
+  "tool_versions": {},
+  "additional_sources": [],
+  "codex_memory": "~/.codex/memories",
+  "memories": [
+    {
+      "id": "workspace",
+      "path": "REPLACE_WITH_REMOTE_CLAUDE_MEMORY_PATH"
+    },
+    {
+      "id": "langchain-learning",
+      "path": "REPLACE_WITH_REMOTE_LANGCHAIN_MEMORY_PATH"
+    },
+    {
+      "id": "worldquant",
+      "path": "REPLACE_WITH_REMOTE_WORLDQUANT_MEMORY_PATH"
+    }
+  ],
+  "projects": {}
+}
