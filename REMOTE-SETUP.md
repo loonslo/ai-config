@@ -5,10 +5,22 @@ This repository contains shareable rules, synchronization code, schemas and a sa
 ## On the remote device
 
 1. Clone this private repository.
-2. Copy `examples/device.remote.json` to a local `device.json` outside Git.
-3. Replace every `REPLACE_WITH_*` path with an absolute path on the remote device. Keep `device` unique for that machine.
+2. Run the quick read-only check from the repository root:
+
+```text
+python scripts/sync.py quick
+```
+
+3. Review the JSON output, then apply the shareable rules:
+
+```text
+python scripts/sync.py quick --apply
+```
+
+This auto-detects the standard Codex and Claude directories and creates a Git-ignored local `device.json` only with `--apply`. It does not copy credentials, full tool configuration, or memory. Memory remains `not_run` until a private `ai-memory` repository and explicit mappings are configured.
+
 4. Sign in to Codex and Claude on that device using their normal local flow. Do not copy `auth.json`, cookies, session databases or full tool configuration files.
-5. Review previews first:
+5. If this device needs memory or custom paths, copy `examples/device.remote.json` to a local `device.json`, replace the `REPLACE_WITH_*` paths, keep `device` unique, and use the explicit commands below. Review previews first:
 
 ```text
 python scripts/sync.py inventory --local device.json

@@ -6,7 +6,7 @@
 
 ## 本次實施記錄（2026-09-11）
 
-目前以 26 項隔離測試驗證：計畫／來源重驗、三方記憶合併與 start 前快照、便攜路徑碰撞、最後文件刪除、統一鎖、事務日誌／備份／恢復、不可變快照、來源盤點、配置版本、交接完整性、doctor、finish、restore 及保守 Git 傳輸。原有入口仍可用，預設為預覽；P3 真機驗收不在此清單內。
+目前以 27 項隔離測試驗證：計畫／來源重驗、三方記憶合併與 start 前快照、便攜路徑碰撞、最後文件刪除、統一鎖、事務日誌／備份／恢復、不可變快照、來源盤點、配置版本、交接完整性、doctor、finish、restore、快速初始化及保守 Git 傳輸。原有入口仍可用，預設為預覽；P3 真機驗收不在此清單內。
 
 尚未宣告完成：真實三台設備的新會話讀取、實際私有遠端配置、獨立加密備份與恢復演練，以及 Claude／Codex 在本機版本上的完整原生讀寫行為驗證。Codex 目前只有快照／參考索引，不是原生記憶導入。這些屬 P3／實機驗收，不能由隔離文件測試代替。
 
@@ -209,6 +209,7 @@ Claude 與 Codex 原始記憶分開保存，公共整合視圖保留來源。第
 以下命令已由 `scripts/sync.py` 和 `scripts/git-memory.py` 提供；預設只預覽，會寫入或傳輸的操作必須明確加 `--apply`。
 
 ```text
+python scripts/sync.py quick [--local <本機配置>] [--apply]
 python scripts/sync.py doctor --local <本機配置>
 python scripts/sync.py inventory --local <本機配置>
 python scripts/sync.py finish --project <id> --handoff <交接文件> --local <本機配置>
@@ -218,6 +219,8 @@ python scripts/git-memory.py init --local <本機配置>
 python scripts/git-memory.py pull --local <本機配置>
 python scripts/git-memory.py push --local <本機配置>
 ```
+
+`quick` 不指定配置時會自動使用標準 Codex／Claude 路徑；第一次只預覽，`quick --apply` 才會建立 Git 忽略的本機 `device.json`、套用公共規則並保存來源盤點。它不複製憑據、不覆蓋完整工具配置、不執行記憶同步；需要記憶時再填寫私有 `ai-memory` 和 `memories` 映射。
 
 退出碼：0＝完成或合法預覽；2＝交接／配置／來源不具備接續條件；3＝待上傳或網路問題；4＝衝突；1＝其他錯誤。`finish --apply`、`start --apply`、`restore --apply` 才會寫入；`inventory --apply` 和 `doctor --recover` 也屬明確寫入操作。預覽的 0 不代表 `ready`。
 

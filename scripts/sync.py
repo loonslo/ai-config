@@ -4,7 +4,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import platform
 from pathlib import Path
+import re
 import sys
 import time
 from typing import Any, Mapping
@@ -13,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sync_core.config import SHARED_CLAUDE_KEYS, SHARED_CODEX_KEYS
+from sync_core.config import DeviceConfig, SHARED_CLAUDE_KEYS, SHARED_CODEX_KEYS
 from sync_core.config import absolute as config_absolute
 from sync_core.config import load as load_config
 from sync_core.handoff import code_facts, configuration_facts, register_project, save_handoff, start_report, validate_handoff
@@ -162,34 +164,41 @@ def _config_plan(config: dict[str, Any], state: Path) -> PlannedChanges:
     if "codex" in config:
         target = config_absolute(config["codex"]) / "config.toml"
         current = read(target)
-        document = tomlkit.parse((current or b"").decode("utf-8"))
+        if not config.get("codex_keys") and not config.get("codex_overrides"):
+            document = None
+        else:
+            document = tomlkit.parse((current or b"").decode("utf-8"))
         template = tomlkit.parse((ROOT / "codex/config.toml").read_text(encoding="utf-8"))
-        for key in config.get("codex_keys", []):
-            if key not in SHARED_CODEX_KEYS or key not in template or isinstance(template[key], dict):
-                raise ValueError(f"Unsupported shared scalar key: {key}")
-            document[key] = template[key]
-        for key, value in config.get("codex_overrides", {}).items():
-            if isinstance(value, (dict, list)):
-                raise ValueError("codex_overrides supports scalar values only")
-            document[key] = value
-        result = tomlkit.dumps(document).encode("utf-8")
-        if result != current:
-            changes[target] = result
-        expected[target] = digest(current)
+        if document is None:
+            pass
+        else:
+            for key in config.get("codex_keys", []):
+                if key not in SHARED_CODEX_KEYS or key not in template or isinstance(template[key], dict):
+                    raise ValueError(f"Unsupported shared scalar key: {key}")
+                document[key] = template[key]
+            for key, value in config.get("codex_overrides", {}).items():
+                if isinstance(value, (dict, list)):
+                    raise ValueError("codex_overrides supports scalar values only")
+                document[key] = value
+            result = tomlkit.dumps(document).encode("utf-8")
+            if result != current:
+                changes[target] = result
+            expected[target] = digest(current)
     if "claude" in config:
         target = config_absolute(config["claude"]) / "settings.json"
         current = read(target)
-        document = json.loads(current or b"{}")
-        template = json.loads((ROOT / "claude/settings.shared.json").read_text(encoding="utf-8"))
-        for key in config.get("claude_keys", []):
-            if key not in SHARED_CLAUDE_KEYS or key not in template:
-                raise ValueError(f"Unsupported shared Claude key: {key}")
-            document[key] = template[key]
-        document.update(config.get("claude_overrides", {}))
-        result = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
-        if result != current:
-            changes[target] = result
-        expected[target] = digest(current)
+        if config.get("claude_keys") or config.get("claude_overrides"):
+            document = json.loads(current or b"{}")
+            template = json.loads((ROOT / "claude/settings.shared.json").read_text(encoding="utf-8"))
+            for key in config.get("claude_keys", []):
+                if key not in SHARED_CLAUDE_KEYS or key not in template:
+                    raise ValueError(f"Unsupported shared Claude key: {key}")
+                document[key] = template[key]
+            document.update(config.get("claude_overrides", {}))
+            result = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+            if result != current:
+                changes[target] = result
+            expected[target] = digest(current)
     return PlannedChanges(changes, expected=expected, state_root=state, metadata={"operation": "config"})
 
 
@@ -336,6 +345,67 @@ def _snapshot_for_finish(config: dict[str, Any], project_id: str) -> dict[str, A
 
 def _config_facts() -> dict[str, Any]:
     return configuration_facts(ROOT, codex_keys=tuple(SHARED_CODEX_KEYS), claude_keys=tuple(SHARED_CLAUDE_KEYS))
+
+
+def _quick_device_config() -> dict[str, Any]:
+    system = platform.system().casefold()
+    prefix = "mac" if system == "darwin" else "windows" if system == "windows" else system or "device"
+    node = re.sub(r"[^a-z0-9_-]+", "-", platform.node().casefold()).strip("-") or "local"
+    device = f"{prefix}-{node}"[:48].rstrip("-")
+    home = Path.home()
+    return {
+        "device": device,
+        "state_dir": str(home / ".ai-sync" / "state"),
+        "memory_repo": str(home / "ai-memory"),
+        "codex": str(home / ".codex"),
+        "claude": str(home / ".claude"),
+        "codex_keys": [],
+        "codex_overrides": {},
+        "claude_keys": [],
+        "claude_overrides": {},
+        "tool_versions": {},
+        "additional_sources": [],
+        "codex_memory": str(home / ".codex" / "memories"),
+        "memories": [],
+        "projects": {},
+    }
+
+
+def _quick_setup(config: dict[str, Any], local: Path, *, apply: bool, generated: bool) -> dict[str, Any]:
+    loaded = load_config(local) if local.exists() else None
+    device_config = loaded or DeviceConfig(config, local)
+    inventory = discover(device_config)
+    state = config_absolute(config["state_dir"])
+    rules = _rules_plan(config, state)
+    shared_config = _config_plan(config, state)
+    report: dict[str, Any] = {
+        "status": "preview",
+        "ready": False,
+        "config_path": str(local.resolve()),
+        "config_created": generated,
+        "device": config["device"],
+        "inventory_id": inventory["inventory_id"],
+        "inventory_summary": inventory["summary"],
+        "rules_changes": len(rules),
+        "config_changes": len(shared_config),
+        "memory_status": "not_run",
+        "memory_note": "Memory sync requires an explicitly configured private ai-memory repository and mappings.",
+    }
+    if not apply:
+        return report
+    if generated:
+        from sync_core.utils import atomic_write, json_bytes
+        atomic_write(local.resolve(), json_bytes(config))
+    if rules:
+        transaction(rules, state / "backups", state_root=state)
+    if shared_config:
+        transaction(shared_config, state / "backups", state_root=state)
+    with SyncLock(state):
+        inventory_path = persist_report(load_config(local), inventory)
+    report["status"] = "ready"
+    report["ready"] = True
+    report["inventory_path"] = str(inventory_path)
+    return report
 
 
 def _persist_memory_snapshots(config: dict[str, Any]) -> list[str]:
@@ -551,8 +621,8 @@ def _start_plan(config: dict[str, Any], project_id: str, report: dict[str, Any],
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=["rules", "config", "memory", "doctor", "inventory", "finish", "start", "restore"])
-    parser.add_argument("--local", type=Path, required=True)
+    parser.add_argument("mode", choices=["quick", "rules", "config", "memory", "doctor", "inventory", "finish", "start", "restore"])
+    parser.add_argument("--local", type=Path, default=Path("device.json"))
     parser.add_argument("--apply", action="store_true", help="Apply a previewed operation")
     parser.add_argument("--project")
     parser.add_argument("--handoff")
@@ -560,8 +630,14 @@ def main() -> None:
     parser.add_argument("--snapshot")
     parser.add_argument("--recover", action="store_true", help="Explicitly roll back recoverable interrupted transactions")
     args = parser.parse_args()
-    config = load_config(args.local).raw
+    generated_config = args.mode == "quick" and not args.local.exists()
+    config = _quick_device_config() if generated_config else load_config(args.local).raw
     state = config_absolute(config["state_dir"])
+
+    if args.mode == "quick":
+        report = _quick_setup(config, args.local, apply=args.apply, generated=generated_config)
+        print(json.dumps(report, ensure_ascii=False))
+        return
 
     if args.mode in {"rules", "config", "memory"}:
         changes = plan(config, args.mode)

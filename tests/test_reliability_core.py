@@ -248,6 +248,51 @@ none
         save_handoff(memory_root, project_id="project", text=handoff, project_root=tmp_path / "project", memory_snapshot=wrong["snapshot_id"], config_version="config-v1")
 
 
+def test_quick_setup_detects_and_applies_only_shareable_configuration(tmp_path, monkeypatch):
+    from scripts import sync as sync_script
+
+    source_root = tmp_path / "config-source"
+    for name in ("instructions", "principles", "engineering", "python", "langgraph", "rag", "security"):
+        path = source_root / "common" / f"{name}.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(name)
+    (source_root / "codex").mkdir()
+    (source_root / "claude").mkdir()
+    (source_root / "codex/config.toml").write_text('approval_policy = "on-request"\n')
+    (source_root / "claude/settings.shared.json").write_text('{"autoMemoryEnabled": true}\n')
+    monkeypatch.setattr(sync_script, "ROOT", source_root)
+    local = tmp_path / "device.json"
+    config = {
+        "device": "windows-quick",
+        "state_dir": str(tmp_path / "state"),
+        "memory_repo": str(tmp_path / "memory"),
+        "codex": str(tmp_path / "codex-home"),
+        "claude": str(tmp_path / "claude-home"),
+        "codex_keys": [],
+        "codex_overrides": {},
+        "claude_keys": [],
+        "claude_overrides": {},
+        "tool_versions": {},
+        "additional_sources": [],
+        "codex_memory": str(tmp_path / "codex-home/memories"),
+        "memories": [],
+        "projects": {},
+    }
+    preview = sync_script._quick_setup(config, local, apply=False, generated=True)
+    assert preview["status"] == "preview"
+    assert preview["ready"] is False
+    assert preview["config_created"] is True
+    assert not local.exists()
+    applied = sync_script._quick_setup(config, local, apply=True, generated=True)
+    assert applied["status"] == "ready"
+    assert applied["ready"] is True
+    assert local.exists()
+    assert (tmp_path / "codex-home/AGENTS.md").exists()
+    assert (tmp_path / "claude-home/CLAUDE.md").exists()
+    assert not (tmp_path / "codex-home/config.toml").exists()
+    assert not (tmp_path / "claude-home/settings.json").exists()
+
+
 def _start_fixture(tmp_path, *, local_text: str, remote_text: str | None, with_parent: bool = True, remote_extra: dict[str, bytes] | None = None):
     from scripts import sync as sync_script
 

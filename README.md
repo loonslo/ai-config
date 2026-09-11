@@ -38,6 +38,7 @@ ai-memory/
 所有命令默认只预览；只有加上 `--apply` 才会写入。每次写入前都会重验计划当时的文件／来源树哈希。
 
 ```text
+python scripts/sync.py quick [--local device.json] [--apply]
 python scripts/sync.py doctor --local device.json
 python scripts/sync.py doctor --local device.json --recover  # explicit rollback review
 python scripts/sync.py inventory --local device.json [--apply]
@@ -48,6 +49,8 @@ python scripts/sync.py finish --project <id> --handoff <handoff.md> --local devi
 python scripts/sync.py start --project <id> --handoff-id <id> --local device.json [--apply]
 python scripts/sync.py restore --snapshot <id> --local device.json [--apply]
 ```
+
+想快速开始时，直接运行 `python scripts/sync.py quick` 做只读盘点；确认输出后运行 `python scripts/sync.py quick --apply`。它会自动使用标准的 Codex／Claude 目录，必要时生成一个已被 Git 忽略的本机 `device.json`，并只应用公共规则。默认不复制凭据、不写入完整工具配置、不同步记忆；要启用记忆，之后再手动配置 `memories` 和私有 `ai-memory` 仓库。
 
 `inventory` 会把来源区分为 `normal`、`normal_but_empty`、`missing`、`unreadable`、`blocked_secret`、`pending_mapping`、`not_configured`、`intentionally_excluded` 等状态；新来源不会被静默跳过。`doctor` 只读并列出需要处理的事务与来源状态。
 
@@ -65,7 +68,14 @@ python scripts/sync.py restore --snapshot <id> --local device.json [--apply]
 python -m pip install -r requirements.txt
 ```
 
-macOS 如只有 python3，将命令中的 python 替换为 python3。复制 device.example.json 为 device.json；也可保存在仓库外，通过 --local 指定。
+macOS 如只有 python3，将命令中的 python 替换为 python3。最短首次设置路径是：
+
+```text
+python scripts/sync.py quick
+python scripts/sync.py quick --apply
+```
+
+需要记忆映射或自定义路径时，再复制 `examples/device.remote.json` 为 `device.json`（或放在仓库外，通过 `--local` 指定）并按下文填写。
 
 - 三台设备使用不同 device，例如 windows-a、windows-b、mac。
 - state_dir 保存本机基线和备份，不同步、不删除。
