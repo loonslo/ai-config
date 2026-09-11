@@ -1,5 +1,5 @@
 # Claude Code 配置
 
-跨工具规则源文件位于 `../common/instructions.md`。运行 `scripts/link-global.ps1 -Mode Apply` 后，Claude Code 的全局 `CLAUDE.md` 会挂载到该文件。
+跨工具规则源文件位于 `../common/`。运行跨平台 `scripts/sync.py rules --local device.json --apply` 后，全部主题写入全局 CLAUDE.md 的受管区块，原有区块外内容保留。先不加 --apply 预览。
 
-`settings.example.json` 只作为结构占位。设备差异和凭据不要直接写入共享 `settings.json`。
+`settings.shared.json` 是共享字段来源；本机 device.json 中 claude_keys 选择实际应用字段。自动记忆通过 memories 项目映射同步到独立 ai-memory，具体流程见根 README。凭据不写入任何共享设置。

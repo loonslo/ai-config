@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai-sync device configuration",
+  "type": "object",
+  "required": ["device", "state_dir", "memory_repo"],
+  "properties": {
+    "device": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "state_dir": {"type": "string"},
+    "memory_repo": {"type": "string"},
+    "codex": {"type": "string"},
+    "claude": {"type": "string"},
+    "codex_memory": {"type": "string"},
+    "codex_keys": {"type": "array", "uniqueItems": true, "items": {"enum": ["approval_policy", "sandbox_mode", "web_search", "model_reasoning_effort", "project_doc_max_bytes"]}},
+    "claude_keys": {"type": "array", "uniqueItems": true, "items": {"enum": ["autoMemoryEnabled"]}},
+    "codex_overrides": {"type": "object"},
+    "claude_overrides": {"type": "object"},
+    "tool_versions": {"type": "object", "additionalProperties": {"type": "string"}},
+    "additional_sources": {"type": "array", "items": {"$ref": "#/$defs/additionalSource"}},
+    "memories": {"type": "array", "items": {"$ref": "#/$defs/memoryMapping"}},
+    "projects": {"type": "object", "additionalProperties": {"type": "string"}}
+  },
+  "$defs": {
+    "memoryMapping": {
+      "type": "object",
+      "required": ["id", "path"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+        "path": {"type": "string"},
+        "initialize": {"type": "boolean"},
+        "exclude": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "additionalSource": {
+      "type": "object",
+      "required": ["id", "path"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+        "tool": {"type": "string"},
+        "path": {"type": "string"},
+        "project_id": {"type": ["string", "null"]},
+        "exclude": {"type": "array", "items": {"type": "string"}},
+        "status": {"enum": ["intentionally_excluded"]},
+        "reason": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

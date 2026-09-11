@@ -1,6 +1,6 @@
 # Developer Profile
 
-本文件是 Codex、Claude Code、Cursor、Continue 等工具共享的个人开发规范源文件。主题细则保存在同目录的 `principles.md`、`engineering.md`、`python.md`、`langgraph.md`、`rag.md` 和 `security.md`。
+本文件是个人开发规范源文件。跨设备部署时，脚本会将 common/ 下的主题细则一起编入全局规则文件。
 
 ## Coding Style
 

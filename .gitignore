@@ -31,3 +31,7 @@ tmp/
 Thumbs.db
 .idea/
 .vscode/
+device.json
+__pycache__/
+.pytest_cache/
+.venv/

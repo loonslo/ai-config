@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai-sync task handoff",
+  "type": "object",
+  "required": ["schema_version", "handoff_id", "project_id", "status", "code", "memory_snapshot"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "handoff_id": {"type": "string", "pattern": "^[a-f0-9]+$"},
+    "project_id": {"type": "string"},
+    "status": {"enum": ["ready", "uploaded", "incomplete", "pending"]},
+    "missing_fields": {"type": "array", "items": {"type": "string"}},
+    "code": {"type": "object", "required": ["commit", "branch", "dirty_files", "lock_files", "remote_commit"], "properties": {"commit": {"type": ["string", "null"]}, "branch": {"type": ["string", "null"]}, "dirty_files": {"type": "array", "items": {"type": "string"}}, "lock_files": {"type": "object"}, "remote_commit": {"type": ["string", "null"]}}},
+    "config_version": {"type": ["string", "null"]},
+    "config": {"type": ["object", "null"], "properties": {"schema_version": {"const": 1}, "version": {"type": ["string", "null"]}, "commit": {"type": ["string", "null"]}, "branch": {"type": ["string", "null"]}, "dirty_files": {"type": "array"}, "missing_files": {"type": "array"}, "files": {"type": "object"}, "codex_keys": {"type": "array"}, "claude_keys": {"type": "array"}, "ready": {"type": "boolean"}}},
+    "memory_snapshot": {"type": ["string", "null"]},
+    "document_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

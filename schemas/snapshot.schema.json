@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai-sync immutable memory snapshot",
+  "type": "object",
+  "required": ["schema_version", "snapshot_id", "device_id", "scope", "source_status", "files", "deletions", "manifest_sha256"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "snapshot_id": {"type": "string", "pattern": "^[a-f0-9]+$"},
+    "device_id": {"type": "string"},
+    "scope": {"type": "string"},
+    "tool": {"type": "string", "enum": ["claude", "codex"]},
+    "project_id": {"type": ["string", "null"]},
+    "source_status": {"enum": ["normal", "normal_but_empty", "empty", "excluded", "intentionally_excluded"]},
+    "parent_snapshot": {"type": ["string", "null"]},
+    "files": {"type": "array", "items": {"$ref": "#/$defs/file"}},
+    "deletions": {"type": "array", "items": {"type": "object", "required": ["path", "previous_sha256", "parent_snapshot"]}},
+    "manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "$defs": {
+    "file": {
+      "type": "object",
+      "required": ["path", "sha256", "size", "object"],
+      "properties": {
+        "path": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "size": {"type": "integer", "minimum": 0},
+        "object": {"type": "string", "pattern": "^objects/[a-f0-9]{64}\\.md$"}
+      }
+    }
+  }
+}

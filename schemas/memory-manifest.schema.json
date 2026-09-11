@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ai-sync memory manifest",
+  "description": "The immutable snapshot manifest used as the memory inventory format.",
+  "$ref": "snapshot.schema.json"
+}

@@ -1,0 +1,16 @@
+{
+  "device": "windows-a",
+  "state_dir": "~/.ai-sync/state",
+  "memory_repo": "~/ai-memory",
+  "codex": "~/.codex",
+  "claude": "~/.claude",
+  "codex_keys": ["approval_policy", "sandbox_mode", "web_search", "model_reasoning_effort", "project_doc_max_bytes"],
+  "codex_overrides": {},
+  "claude_keys": ["autoMemoryEnabled"],
+  "claude_overrides": {},
+  "tool_versions": {},
+  "additional_sources": [],
+  "codex_memory": "~/.codex/memories",
+  "memories": [],
+  "projects": {}
+}
