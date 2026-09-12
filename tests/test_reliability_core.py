@@ -325,6 +325,10 @@ def _start_fixture(tmp_path, *, local_text: str, remote_text: str | None, with_p
         "memories": [{"id": "project", "path": str(source)}],
         "projects": {"project": str(project)},
     }
+    if with_parent:
+        state = Path(config["state_dir"])
+        state.mkdir(parents=True, exist_ok=True)
+        (state / "memory-project.json").write_text(json.dumps({"schema_version": 1, "files": {"MEMORY.md": digest(b"base")}}))
     return sync_script, config, source, handoff["snapshot_id"], memory_repo
 
 
@@ -380,7 +384,7 @@ def test_cli_missing_handoff_is_incomplete_exit(tmp_path):
 
 
 def test_finish_cli_returns_incomplete_for_unconfirmed_config(tmp_path):
-    external = Path(tempfile.mkdtemp(prefix="ai-sync-finish-", dir=str(tmp_path.parents[5])))
+    external = Path(tempfile.mkdtemp(prefix="ai-sync-finish-", dir=str(Path(__file__).resolve().parents[2])))
     source = external / "native-memory"
     source.mkdir()
     (source / "MEMORY.md").write_text("portable fact")

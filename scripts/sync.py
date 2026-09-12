@@ -543,12 +543,11 @@ def _start_plan(config: dict[str, Any], project_id: str, report: dict[str, Any],
             )
         pre_start_snapshot_id = local_snapshot["snapshot_id"]
     remote = snapshot_files(memory_root, manifest)
-    base: dict[str, str] = {}
-    parent_id = manifest.get("parent_snapshot")
-    if parent_id:
-        parent = load_snapshot(memory_root, parent_id, device=manifest.get("device_id"))
-        base_files = snapshot_files(memory_root, parent)
-        base = {name: digest(data) or "" for name, data in base_files.items()}
+    marker = state / f"memory-{project_id}.json"
+    marker_data = read(marker)
+    base = _baseline(marker) if marker_data is not None else {}
+    if marker_data is None and local and local != remote:
+        raise SyncCommandError("Receiver baseline missing; restore its confirmed baseline before merging", EXIT_CONFLICT)
     merged_result = three_way_merge(local, remote, base)
     if merged_result.conflicts:
         raise SyncCommandError(
@@ -593,7 +592,6 @@ def _start_plan(config: dict[str, Any], project_id: str, report: dict[str, Any],
             changes[path] = data
         expected[path] = digest(current)
     marker = state / f"memory-{project_id}.json"
-    marker_data = read(marker)
     marker_result = json.dumps({"schema_version": 1, "files": {name: digest(data) for name, data in merged.items()}}, sort_keys=True).encode("utf-8")
     if marker_result != marker_data:
         changes[marker] = marker_result
@@ -663,8 +661,7 @@ def main() -> None:
         from sync_core.doctor import run
         loaded = load_config(args.local)
         if args.recover:
-            with SyncLock(loaded.state_dir):
-                recover_transactions(loaded.state_dir, action="rollback")
+            recover_transactions(loaded.state_dir, action="rollback")
         report = run(loaded)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         if not report["ok"]:

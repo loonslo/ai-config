@@ -96,7 +96,7 @@ def test_transport_preserves_local_commit_on_true_divergence(tmp_path):
 def test_git_memory_cli_returns_pending_exit_code_on_divergence(tmp_path):
     # The CLI intentionally rejects repositories below the ai-config checkout;
     # place this subprocess fixture beside the checkout, not inside it.
-    external = Path(tempfile.mkdtemp(prefix="ai-sync-cli-", dir=str(tmp_path.parents[5])))
+    external = Path(tempfile.mkdtemp(prefix="ai-sync-cli-", dir=str(Path(__file__).resolve().parents[2])))
     remote, a, b = (external / name for name in ("remote.git", "a", "b"))
     subprocess.run(["git", "init", "--bare", "-b", "main", str(remote)], check=True, capture_output=True)
     _init_memory_repo(a, remote)

@@ -143,16 +143,27 @@ def mark_head_confirmed(root: Path, device: str, scope: str) -> Path:
         raise SnapshotError(f"Snapshot head not found: {device}/{scope}")
     head = json.loads(target.read_text(encoding="utf-8"))
     load_snapshot(root, head["snapshot_id"], device=device)
+    receipt = {"schema_version": 1, "device_id": device, "snapshot_id": head["snapshot_id"], "manifest_sha256": head["manifest_sha256"], "status": "uploaded"}
+    atomic_write(root / "confirmations" / device / f"{head['snapshot_id']}.json", json_bytes(receipt))
     head["status"] = "uploaded"
     atomic_write(target, json_bytes(head))
     return target
+
+
+def snapshot_confirmed(root: Path, manifest: Mapping[str, Any]) -> bool:
+    receipt = root / "confirmations" / manifest["device_id"] / f"{manifest['snapshot_id']}.json"
+    if not receipt.exists():
+        return False
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    return all(data.get(key) == manifest.get(key) for key in ("device_id", "snapshot_id", "manifest_sha256")) and data.get("status") == "uploaded"
 
 
 def mark_all_heads_confirmed(root: Path) -> list[Path]:
     changed: list[Path] = []
     for target in sorted((root / "heads").glob("*/*.json")):
         head = json.loads(target.read_text(encoding="utf-8"))
-        if head.get("status") == "uploaded":
+        receipt = root / "confirmations" / head["device_id"] / f"{head['snapshot_id']}.json"
+        if head.get("status") == "uploaded" and receipt.exists():
             continue
         mark_head_confirmed(root, head["device_id"], head["scope"])
         changed.append(target)
@@ -166,6 +177,7 @@ def _find_snapshot(root: Path, snapshot_id: str, device: str | None = None) -> P
         candidate = _snapshot_path(root, device, snapshot_id)
         if candidate.exists():
             return candidate
+        raise SnapshotError(f"Snapshot not found for requested device: {device}/{snapshot_id}")
     candidates = list((root / "snapshots").glob(f"*/{snapshot_id}.json"))
     if len(candidates) != 1:
         raise SnapshotError(f"Snapshot not found or ambiguous: {snapshot_id}")
@@ -177,11 +189,17 @@ def load_snapshot(root: Path, snapshot_id: str, *, device: str | None = None, ve
     manifest = json.loads(target.read_text(encoding="utf-8"))
     if manifest.get("schema_version") != SCHEMA_VERSION or manifest.get("snapshot_id") != snapshot_id:
         raise SnapshotError(f"Unsupported or mismatched snapshot manifest: {snapshot_id}")
+    if manifest.get("device_id") != target.parent.name:
+        raise SnapshotError(f"Snapshot device does not match its path: {snapshot_id}")
     if manifest.get("manifest_sha256") != _manifest_hash(manifest):
         raise SnapshotError(f"Snapshot manifest hash mismatch: {snapshot_id}")
     if verify_objects:
+        names = set()
         for item in manifest.get("files", []):
             name = safe_relative(item["path"])
+            if name in names:
+                raise SnapshotError(f"Duplicate snapshot path: {name}")
+            names.add(name)
             if name != item["path"]:
                 raise SnapshotError(f"Non-canonical snapshot path: {name}")
             object_path = root / item["object"]

@@ -22,7 +22,7 @@ class PushResult:
     detail: str | None = None
 
 
-_ROOTS = {"registry", "objects", "snapshots", "heads", "integrated", "handoffs", "claude", "codex"}
+_ROOTS = {"registry", "objects", "snapshots", "heads", "confirmations", "integrated", "handoffs", "claude", "codex"}
 
 
 def _run(root: Path, *args: str, check: bool = True) -> str:
@@ -130,9 +130,18 @@ class GitTransport:
         self.validate()
         scan_history(self.root)
         paths = publishable_paths(self.root)
+        staged_before = set(filter(None, _run(self.root, "diff", "--cached", "--name-only", "-z").split("\x00")))
+        if staged_before - set(paths):
+            raise ValueError("Unexpected staged files; review the index before publishing")
         if paths:
             _run(self.root, "add", "--all", "--", *paths)
-        staged = tuple(filter(None, _run(self.root, "diff", "--cached", "--name-only").splitlines()))
+        staged = tuple(filter(None, _run(self.root, "diff", "--cached", "--name-only", "-z").split("\x00")))
+        if set(staged) - set(paths):
+            raise ValueError("Unexpected staged files; index changed during publishing")
+        for name in staged:
+            result = subprocess.run(["git", "-C", str(self.root), "show", f":{name}"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            if result.returncode == 0 and SECRET.search(result.stdout.decode("utf-8", errors="replace")):
+                raise ValueError("Potential secret in staged content; publishing blocked")
         if staged:
             _run(self.root, "commit", "-m", message)
         commit = _run(self.root, "rev-parse", "HEAD", check=False) or None

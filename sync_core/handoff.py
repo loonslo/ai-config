@@ -12,7 +12,7 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit, urlunsplit
 import uuid
 
-from .snapshots import load_snapshot
+from .snapshots import load_snapshot, snapshot_confirmed
 from .utils import SECRET, atomic_write, digest, json_bytes
 
 
@@ -28,6 +28,11 @@ REQUIRED_HEADINGS = {
     "risks": ("risk", "風險"),
 }
 _PLACEHOLDER_LINES = {"todo", "tbd", "待填写", "待填", "未填写", "placeholder", "由当前助手或使用者填写。"}
+
+
+def _validate_ids(project_id: str, handoff_id: str) -> None:
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", project_id) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", handoff_id):
+        raise ValueError("Invalid project or handoff id")
 
 
 @dataclass(frozen=True)
@@ -95,11 +100,17 @@ def configuration_facts(root: Path, *, codex_keys: tuple[str, ...] = (), claude_
         path = root / relative
         files[relative] = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
     portable = {"schema_version": 1, "commit": commit, "branch": branch, "remote": remote, "remote_commit": remote_commit, "files": files, "codex_keys": sorted(codex_keys), "claude_keys": sorted(claude_keys)}
-    portable["version"] = hashlib.sha256(json_bytes(portable)).hexdigest()
+    portable["version"] = configuration_content_version(portable)
     portable["dirty_files"] = list(dirty)
     portable["missing_files"] = sorted(name for name, file_hash in files.items() if file_hash is None)
     portable["ready"] = bool(commit and remote and remote_commit == commit and not dirty and not portable["missing_files"])
     return portable
+
+
+def configuration_content_version(facts: Mapping[str, Any]) -> str:
+    """Runtime/remote observations do not change portable configuration content."""
+    content = {key: facts.get(key) for key in ("schema_version", "files", "codex_keys", "claude_keys")}
+    return hashlib.sha256(json_bytes(content)).hexdigest()
 
 
 def register_project(memory_root: Path, project_id: str, project_root: Path, name: str | None = None) -> Path:
@@ -112,6 +123,8 @@ def register_project(memory_root: Path, project_id: str, project_root: Path, nam
         registry = {"schema_version": 1, "projects": {}}
     existing = registry.setdefault("projects", {}).get(project_id, {})
     remote = _safe_remote(_git(project_root, "remote", "get-url", "origin"))
+    if existing and existing.get("remote") != remote:
+        raise ValueError("Project id is already registered to a different remote")
     record = {"id": project_id, "name": name or existing.get("name") or project_root.name, "remote": remote}
     registry["schema_version"] = 1
     registry["projects"][project_id] = record
@@ -160,6 +173,7 @@ def save_handoff(
     if SECRET.search(text):
         raise ValueError("Potential secret in handoff; content was not saved")
     hid = handoff_id or uuid.uuid4().hex
+    _validate_ids(project_id, hid)
     facts = code_facts(project_root)
     missing = validate_handoff(text)
     if memory_snapshot:
@@ -173,7 +187,7 @@ def save_handoff(
         "handoff_id": hid,
         "project_id": project_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "status": "ready" if not missing and facts.ready else "incomplete",
+        "status": "ready" if not missing and facts.ready and memory_snapshot and config_facts and config_facts.get("ready") else "incomplete",
         "missing_fields": missing,
         "code": {"commit": facts.commit, "branch": facts.branch, "dirty_files": list(facts.dirty_files), "lock_files": dict(facts.lock_files), "remote": facts.remote, "remote_commit": facts.remote_commit},
         "config_version": effective_config_version,
@@ -190,12 +204,15 @@ def save_handoff(
 
 
 def load_handoff(memory_root: Path, project_id: str, handoff_id: str) -> dict[str, Any]:
+    _validate_ids(project_id, handoff_id)
     target = memory_root / "handoffs" / project_id / f"{handoff_id}.json"
     if not target.exists():
         raise ValueError(f"Handoff not found: {project_id}/{handoff_id}")
     data = json.loads(target.read_text(encoding="utf-8"))
     if data.get("schema_version") != 1:
         raise ValueError("Unsupported handoff schema")
+    if data.get("project_id") != project_id or data.get("handoff_id") != handoff_id:
+        raise ValueError("Handoff identity does not match its path")
     return data
 
 
@@ -217,8 +234,7 @@ def start_report(memory_root: Path, project_id: str, handoff_id: str, project_ro
         try:
             manifest = load_snapshot(memory_root, snapshot_id)
             snapshot_ok = manifest.get("project_id") == project_id and manifest.get("scope") == project_id and manifest.get("tool") == "claude"
-            head_path = memory_root / "heads" / manifest.get("device_id", "") / f"{project_id}.json"
-            if snapshot_ok and (not head_path.exists() or json.loads(head_path.read_text(encoding="utf-8")).get("status") != "uploaded"):
+            if snapshot_ok and not snapshot_confirmed(memory_root, manifest):
                 snapshot_ok = False
                 snapshot_error = "memory snapshot is not remotely confirmed"
             if not snapshot_ok:
@@ -251,7 +267,8 @@ def start_report(memory_root: Path, project_id: str, handoff_id: str, project_ro
         "lock_files_match": dict(current.lock_files) == expected.get("lock_files", {}),
     }
     if current_config is not None and handoff.get("config"):
-        checks["config_matches"] = dict(current_config) == handoff["config"]
+        checks["config_matches"] = configuration_content_version(current_config) == configuration_content_version(handoff["config"])
+        checks["config_clean"] = not current_config.get("dirty_files") and not current_config.get("missing_files")
         if not checks["config_matches"]:
             errors.append("ai-config facts do not match the handoff")
     elif current_config is not None and handoff.get("config_version"):

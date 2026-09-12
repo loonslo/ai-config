@@ -50,35 +50,54 @@ class SyncLock:
         self.state_root = state_root
         self.path = _lock_path(state_root)
         self.acquired = False
+        self.handle = None
 
     def __enter__(self) -> "SyncLock":
         self.state_root.mkdir(parents=True, exist_ok=True)
-        payload = {"pid": os.getpid(), "started_at": _now(), "operation_id": uuid.uuid4().hex}
+        # Keep the guard inode permanently. Deleting a locked file would let
+        # another process lock a different inode at the same pathname.
+        self.handle = (self.state_root / "sync.guard").open("a+b")
+        if self.handle.tell() == 0:
+            self.handle.write(b"0")
+            self.handle.flush()
+        self.handle.seek(0)
         try:
-            with self.path.open("x", encoding="utf-8") as handle:
-                json.dump(payload, handle)
-        except FileExistsError as error:
-            try:
-                previous = json.loads(self.path.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                previous = {}
-            pid = previous.get("pid") if isinstance(previous, dict) else None
-            if isinstance(pid, int) and process_is_alive(pid):
-                raise SyncBusyError(f"Sync is already running (pid {pid})") from error
-            stale = self.path.with_name(f"sync.lock.stale-{uuid.uuid4().hex}.json")
-            try:
-                os.replace(self.path, stale)
-            except FileNotFoundError:
-                raise SyncBusyError("Sync lock changed while recovering a stale lock") from error
-            with self.path.open("x", encoding="utf-8") as handle:
-                json.dump(payload, handle)
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(self.handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as error:
+            self.handle.close()
+            self.handle = None
+            raise SyncBusyError("Sync is already running") from error
         self.acquired = True
+        try:
+            if self.path.exists():
+                try:
+                    previous = json.loads(self.path.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    previous = {}
+                pid = previous.get("pid") if isinstance(previous, dict) else None
+                if isinstance(pid, int) and process_is_alive(pid):
+                    raise SyncBusyError("A legacy sync operation is still running; close it before upgrading")
+            atomic_write(self.path, json_bytes({"pid": os.getpid(), "started_at": _now()}))
+        except BaseException:
+            self.handle.close()
+            self.handle = None
+            self.acquired = False
+            raise
         return self
 
     def __exit__(self, *_: object) -> None:
         if self.acquired:
-            self.path.unlink(missing_ok=True)
-            self.acquired = False
+            try:
+                self.path.unlink(missing_ok=True)
+            finally:
+                self.handle.close()  # Kernel releases the lock, even on crash.
+                self.handle = None
+                self.acquired = False
 
 
 def _tree_state(root: Path) -> dict[str, str]:
@@ -154,8 +173,13 @@ def transaction(
     operation = operation_id or uuid.uuid4().hex
     context = SyncLock(state) if lock else null_lock()
     with context:
+        pending = recover_transactions(state)
+        if any(item.get("status") in {"PREPARED", "APPLYING", "INTERRUPTED", "ROLLBACK_REQUIRED", "INVALID_JOURNAL"} for item in pending):
+            raise RuntimeError("Unfinished transaction requires recovery before applying changes")
         originals = {path: read_bytes(path) for path in plan}
-        _verify_plan(plan, plan.expected or {path: digest(data) for path, data in originals.items()})
+        expected = {path: digest(data) for path, data in originals.items()}
+        expected.update(plan.expected)
+        _verify_plan(plan, expected)
         backup, records = _backup_originals(originals, backup_root, operation)
         journal_path = _journal_path(state, operation)
         journal: dict[str, Any] = {
@@ -172,10 +196,12 @@ def transaction(
         completed: list[Path] = []
         current: Path | None = None
         try:
-            _verify_plan(plan, plan.expected or {path: digest(data) for path, data in originals.items()})
+            _verify_plan(plan, expected)
             journal["status"] = "APPLYING"
             _write_journal(journal_path, journal)
             for current, data in plan.items():
+                if digest(read_bytes(current)) != expected[current]:
+                    raise ValueError(f"Plan invalidated by a newer change: {current}")
                 write(current, data)
                 completed.append(current)
             journal["status"] = "COMMITTED"
@@ -255,6 +281,9 @@ def recover_transactions(state_root: Path, *, action: str = "status") -> list[di
                         conflicts.append(name)
                         continue
                     data = (backup / item["file"]).read_bytes() if item["existed"] else None
+                    if digest(data) != item.get("sha256"):
+                        conflicts.append(name)
+                        continue
                     write_file(target, data)
                 journal["status"] = "ROLLBACK_REQUIRED" if conflicts else "ROLLED_BACK"
                 if conflicts:
