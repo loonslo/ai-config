@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -12,6 +13,7 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit, urlunsplit
 import uuid
 
+from .config import SHARED_RULE_TOPICS
 from .snapshots import load_snapshot, snapshot_confirmed
 from .utils import SECRET, atomic_write, digest, json_bytes
 
@@ -49,13 +51,71 @@ class CodeFacts:
         return bool(self.commit and self.branch and not self.dirty_files and self.remote and self.commit == self.remote_commit)
 
 
-def _git(root: Path, *args: str) -> str:
-    result = subprocess.run(["git", "-C", str(root), *args], text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+def _git(root: Path, *args: str, timeout: float = 20.0) -> str:
+    """Run a read-only git query with a hard timeout.
+
+    A timeout is essential: a repository whose remote requires interactive
+    credentials would otherwise block the whole sync indefinitely.  Network
+    failure degrades to an empty result so callers report "unknown" instead of
+    hanging.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), *args],
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+            env=_GIT_ENV,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return ""
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+_GIT_ENV = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "", "GCM_INTERACTIVE": "never"}
+
+
+def repo_root(path: Path) -> Path | None:
+    """Return the repository containing ``path`` only if it really is a repo.
+
+    Git walks parent directories, so a plain directory inside another checkout
+    would silently inherit that checkout's remote and branch.  Callers that
+    inspect user project directories must therefore confirm the toplevel before
+    trusting any git fact.
+    """
+    if not path.exists() or not path.is_dir():
+        return None
+    output = _git(path, "rev-parse", "--show-toplevel", timeout=10.0)
+    if not output:
+        return None
+    try:
+        return Path(output).resolve()
+    except OSError:
+        return None
+
+
 def _dirty_files(root: Path) -> tuple[str, ...]:
-    result = subprocess.run(["git", "-C", str(root), "status", "--porcelain"], text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    # ``git status --porcelain`` encodes the index/worktree status in the first
+    # two columns, and a leading space is significant.  Run git directly so the
+    # columns survive; ``_git`` strips the line's leading whitespace.
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "status", "--porcelain"],
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=20.0,
+            env=_GIT_ENV,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return ()
     if result.returncode:
         return ()
     return tuple(line[3:] if len(line) >= 4 else line for line in result.stdout.splitlines() if line.strip())
@@ -87,8 +147,29 @@ def code_facts(root: Path) -> CodeFacts:
     return CodeFacts(commit, branch, dirty, lock_files, remote, remote_commit)
 
 
+def code_facts_for_project(root: Path) -> tuple[CodeFacts, str | None]:
+    """Code facts for a user project directory.
+
+    A plain directory that merely sits below another checkout must not inherit
+    that checkout's commit, branch or remote.  When the exact git toplevel does
+    not match ``root`` the facts are reported as unversioned with a reason
+    instead of silently borrowing a neighbouring repository.
+    """
+    top = repo_root(root)
+    if top is None:
+        return CodeFacts(None, None, (), {}, None, None), "directory is not a Git worktree"
+    if top != root.resolve():
+        return CodeFacts(None, None, (), {}, None, None), f"directory belongs to another worktree: {top.name}"
+    return code_facts(root), None
+
+
 def configuration_facts(root: Path, *, codex_keys: tuple[str, ...] = (), claude_keys: tuple[str, ...] = ()) -> dict[str, Any]:
-    """Capture only portable ai-config facts, never local paths or credentials."""
+    """Capture only portable ai-config facts, never local paths or credentials.
+
+    ``codex_keys``/``claude_keys`` are the fields this device actually selected,
+    not the complete allowlist, so two devices with different selections can be
+    told apart.
+    """
     commit = _git(root, "rev-parse", "HEAD") or None
     branch = _git(root, "branch", "--show-current") or None
     dirty = _dirty_files(root)
@@ -96,7 +177,7 @@ def configuration_facts(root: Path, *, codex_keys: tuple[str, ...] = (), claude_
     remote_commit = _git(root, "ls-remote", "origin", f"refs/heads/{branch}") if remote and branch else ""
     remote_commit = remote_commit.split()[0] if remote_commit else None
     files: dict[str, str | None] = {}
-    for relative in [*(f"common/{name}.md" for name in ("instructions", "principles", "engineering", "python", "langgraph", "rag", "security")), "codex/config.toml", "claude/settings.shared.json"]:
+    for relative in [*(f"common/{name}.md" for name in SHARED_RULE_TOPICS), "codex/config.toml", "claude/settings.shared.json"]:
         path = root / relative
         files[relative] = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
     portable = {"schema_version": 1, "commit": commit, "branch": branch, "remote": remote, "remote_commit": remote_commit, "files": files, "codex_keys": sorted(codex_keys), "claude_keys": sorted(claude_keys)}

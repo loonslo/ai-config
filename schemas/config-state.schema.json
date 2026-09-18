@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/loonslo/ai-config/schemas/config-state.schema.json",
+  "title": "ai-config portable consistency state",
+  "description": "Schema-versioned consistency state for one device. Local-only fields carry real paths and observed values; shared receipt fields are restricted to explicit digests and non-sensitive metadata.",
+  "type": "object",
+  "required": ["schema_version", "device_id", "source", "capabilities", "managed"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "device_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "generated_at": {"type": "string"},
+    "source": {"$ref": "#/$defs/source"},
+    "capabilities": {"$ref": "#/$defs/capabilities"},
+    "managed": {"$ref": "#/$defs/managed"},
+    "shared_receipt": {"$ref": "#/$defs/sharedReceipt"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "statusCode": {
+      "enum": [
+        "not_configured",
+        "pending_sync",
+        "applied",
+        "local_modified",
+        "conflict",
+        "offline",
+        "apply_failed",
+        "restart_required"
+      ]
+    },
+    "source": {
+      "description": "Local identity of the shared configuration source. Paths never travel in receipts.",
+      "type": "object",
+      "required": ["type", "identity", "status"],
+      "properties": {
+        "type": {"enum": ["git", "local"]},
+        "status": {"$ref": "#/$defs/statusCode"},
+        "identity": {"type": "string", "description": "Sanitized remote identity without credentials"},
+        "url": {"type": ["string", "null"], "description": "Local-only; never exported to a shared receipt"},
+        "branch": {"type": ["string", "null"]},
+        "commit": {"type": ["string", "null"]},
+        "remote_commit": {"type": ["string", "null"]},
+        "dirty_files": {"type": "array", "items": {"type": "string"}},
+        "detail": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "capabilityStatus": {
+      "type": "object",
+      "required": ["enabled", "status"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "status": {"$ref": "#/$defs/statusCode"},
+        "detail": {"type": ["string", "null"]},
+        "checked_at": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "description": "Each capability reports independently; configuration must be able to succeed while memory stays disabled.",
+      "type": "object",
+      "required": ["config", "memory", "handoff"],
+      "properties": {
+        "config": {"$ref": "#/$defs/capabilityStatus"},
+        "memory": {"$ref": "#/$defs/capabilityStatus"},
+        "handoff": {"$ref": "#/$defs/capabilityStatus"}
+      },
+      "additionalProperties": false
+    },
+    "managedScope": {
+      "type": "object",
+      "required": ["tool", "target", "fields"],
+      "properties": {
+        "tool": {"enum": ["codex", "claude"]},
+        "target": {"type": ["string", "null"], "description": "Local-only absolute path"},
+        "target_kind": {"enum": ["rules_block", "config", "settings"]},
+        "fields": {"type": "array", "items": {"type": "string"}},
+        "status": {"$ref": "#/$defs/statusCode"},
+        "expected_digest": {"type": ["string", "null"], "description": "Digest of the managed projection the source produces"},
+        "observed_digest": {"type": ["string", "null"], "description": "Digest read back from the real target file"},
+        "detail": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "managed": {
+      "description": "Managed field selection and per-target verification results.",
+      "type": "object",
+      "required": ["shared_fields", "targets"],
+      "properties": {
+        "shared_fields": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}},
+        "expected_summary": {"type": ["string", "null"]},
+        "targets": {"type": "array", "items": {"$ref": "#/$defs/managedScope"}},
+        "last_applied_version": {"type": ["string", "null"]},
+        "last_applied_at": {"type": ["string", "null"]},
+        "last_verified_at": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "sharedReceipt": {
+      "description": "Non-sensitive subset that may be published to the shared receipt branch. No real paths, no observed local values.",
+      "type": "object",
+      "required": ["schema_version", "device_id", "reported_at"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "device_id": {"type": "string"},
+        "reported_at": {"type": "string"},
+        "source_identity": {"type": ["string", "null"]},
+        "source_commit": {"type": ["string", "null"]},
+        "applied_version": {"type": ["string", "null"]},
+        "applied_at": {"type": ["string", "null"]},
+        "shared_fields": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}},
+        "target_digests": {"type": "array", "items": {"type": "object", "required": ["tool", "target_kind"], "properties": {"tool": {"type": "string"}, "target_kind": {"type": "string"}, "expected_digest": {"type": ["string", "null"]}, "status": {"$ref": "#/$defs/statusCode"}}, "additionalProperties": false}},
+        "config_status": {"$ref": "#/$defs/statusCode"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

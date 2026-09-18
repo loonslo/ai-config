@@ -25,9 +25,74 @@
 
 建立日期：2026-09-11。設計依據：task.md。
 
-供下一位執行者直接接手。本文件列出上一輪審查後的逐項狀態。2026-09-12 已以本機隔離測試 39 項通過；三台實機、私有遠端及完整上下文接續尚未驗收。勾選只代表目前程式與測試已有證據，不代表 P3 已完成。
+供下一位執行者直接接手。本文件列出上一輪審查後的逐項狀態。2026-09-12 已以本機隔離測試 39 項通過；2026-09-15 體驗改造（UX-TASKS.md）後全量隔離測試 145 項通過。三台實機、私有遠端及完整上下文接續尚未驗收。勾選只代表目前程式與測試已有證據，不代表 P3 已完成。
+
+## 2026-09-15 體驗改造
+
+依 `UX-TASKS.md` 的 18 項任務實作「不需要手工編輯 JSON」的跨設備配置同步。新增 `sync_core/` 下的
+`status`、`config_status`、`environment`、`messages`、`config_sync`、`wizard`、`restore`、
+`receipts`、`diff_view`、`onboarding` 模組，以及 `ai-config.ps1`／`ai-config.command` 啟動入口與
+`schemas/config-state.schema.json`。文件重寫為 `README.md` 加 `docs/` 四篇。
+
+同期修復的既有缺陷（詳見 `UX-TASKS.md` 的「本次修復的既有缺陷」）：Git 事實採集無限掛起、
+憑據來源被降級為待映射、目標文件缺失被誤判為已應用、`setup.py` 與 pytest 鉤子重名、
+多數新命令只輸出原始 JSON、`verified` 因空受管範圍永遠為假、`diff` 未持久化歸屬選擇、
+啟動腳本在已有 `.venv` 時仍要求系統 Python。
+
+**恢復路徑死循環**（本輪修復，最嚴重的一項）：手改受管規則區塊後 `sync` 報 E3001 並要求
+「執行 diff 選擇處理方式」，但 `diff` 只比較工具配置鍵、完全忽略規則區塊，於是列印
+「沒有需要處理的欄位差異」；使用者照做後再次 `sync` 仍然失敗。已讓 `diff` 識別 `rules_block`
+漂移並單獨列出，規則區塊只提供 `share`／`restore`（`local` 會被拒絕），並新增一次性 restore
+意圖讓明確選擇後才能覆蓋（仍先備份）。同時 `OwnershipError`／`ConfigSyncError` 不再被降級為
+笼統的 E9001。
+
+回歸測試：`tests/test_config_consistency.py`、`tests/test_ux_flows.py`、`tests/test_onboarding.py`、
+`tests/test_launchers.py`。恢復閉環由 `test_restore_choice_overwrites_the_edited_block_after_a_backup`
+逐步走完（手改 → diff → restore → sync 成功 → 再 sync 零變更 → undo 可找回）。三機實機與零基礎
+使用者驗收見 `docs/acceptance.md`，仍待用戶提供設備。
+
+## 2026-09-17 第二輪審查修復（七項）
+
+本輪逐項修復第二輪審查列出的七個缺陷。共同形狀都是「回報了沒有真正發生的事」。
+
+1. **高 · 同步沒有更新配置源**：`sync --fetch` 過去拉的是 `memory_repo`（記憶倉庫），另一台電腦仍可能套用舊配置。
+   新增 `sync_core/config_source.py`：`fetch()` 對**配置源**做只快進下載，`publish()` 只提交並推送
+   `common/`、`codex/`、`claude/`。新增 `--publish`。同步報告與輸出分成四行：下載共享配置／遠端發布／
+   本機應用／狀態上報。分叉或工作區衝突時停止（E2002，退出碼 4），不強制推送。
+   同時把「配置源」統一到一處：`config_repo` 有記錄時，下載、發布、模板讀取、期望投影與共享寫入
+   都指向同一份 checkout（`scripts.sync._source_root`、`config_sync._share_template_root`）。
+2. **高 · 「僅本機保留」無效**：`local_overrides.json` 過去沒有任何讀者。新增
+   `config_sync.effective_overrides()`，把它接入實際寫入（`_config_plan`）、差異比較（`diff`，
+   顯示為「來自本機覆蓋」）與應用核驗（`_expected_projections`）。覆蓋值優先於共享模板，
+   後續同步不再改回共享值。
+3. **高 · 啟用記憶後核驗結果不可信**：期望投影改用與寫入完全相同的規則正文
+   （`scripts.sync._rules_body`，含記憶索引說明），不再用不含該段落的 `_body()`。成功記錄
+   改為**全部核驗通過後**才寫入；`pending_sync` 不再被當成核驗通過（`_targets_verified` 收緊為
+   僅 `applied`，或受管欄位為空的目標）。
+4. **高 · 設備回執沒有真正上傳**：`publish_receipt` / `fetch_receipts` 過去把本機路徑當成遠端，
+   所以「uploaded」永遠讀不到。改為從配置源 checkout 讀取真實遠端地址；無遠端時拋
+   `ReceiptUnavailable`（未配置，不是成功也不是失敗）。同步成功後接入上報，`status` 也改為從
+   **配置源**讀回執（原本錯讀記憶倉庫）。所有 git 呼叫加上 `GIT_TERMINAL_PROMPT=0` 與 stdin 關閉。
+5. **中 · 規則選擇「共享」直接報錯**：`_adopt_local_block_as_baseline` 未匯入 `digest` 導致
+   `NameError`，且它只是刷新本機基線，假稱共享完成。改為 `_stage_local_block`：把本機區塊內容
+   暫存到 `state_dir/rules-share/` 供合併進 `common/`，**不刷新基線**，衝突保護保留到共享內容
+   真正保存並發布。
+6. **中 · 預覽會消耗恢復決定**：`_rules_plan` 過去在規劃時就清除一次性 restore 意圖。
+   改為把決定記在 `PlannedChanges.metadata["accepted_rules"]`（`build_plan` 負責彙整），
+   只有成功套用並核驗通過後才由 `config_sync._consume_restore_intent` 清除。
+7. **中 · 測試依賴 Windows 編碼環境**：測試子程序輸出統一以 `encoding="utf-8"` 解碼；
+   `scripts/sync.py` 在輸出為管道且未設定 `PYTHONIOENCODING` 時固定以 UTF-8 寫出，
+   終端（tty）行為不變。
+
+同時修正一類潛伏缺陷：`git rev-parse <ref>` 在失敗時仍會把 ref 名寫到 stdout，因此
+「分支／FETCH_HEAD 是否存在」的判斷過去一律為真。`config_source`、`receipts`、`transport`
+中所有此類呼叫改用 `rev-parse --verify --quiet`。
+
+回歸測試：`tests/test_sync_integrity.py`（18 項），全量隔離測試 163 項通過。
+文檔同步：`README.md`、`docs/getting-started.md`、`docs/advanced.md`、`docs/troubleshooting.md`。
 
 ## 執行約束
+
 
 - 保留現有未提交改動，不 reset、不清空工具目錄。
 - 先在隔離目錄補回歸測試，再做最小修復；真實記憶不得作為測試輸出。

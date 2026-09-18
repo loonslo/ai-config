@@ -27,6 +27,10 @@ class SourceReport:
     version: str | None = None
 
 
+#: Scan results that must never be softened into "just confirm the mapping".
+BLOCKING_SCAN_STATUSES = frozenset({"blocked_secret", "unreadable", "unsupported", "path_collision"})
+
+
 def scan_source(path: Path, *, source_id: str, tool: str, project_id: str | None = None, exclude: Iterable[str] = (), version: str | None = None) -> SourceReport:
     excluded_names = set(exclude)
     if not path.exists():
@@ -63,6 +67,18 @@ def scan_source(path: Path, *, source_id: str, tool: str, project_id: str | None
     return SourceReport(source_id, tool, status, str(path), project_id, len(clean), tuple(clean), excluded_records, version=version)
 
 
+def _as_candidate(report: SourceReport, detail: str) -> SourceReport:
+    """Mark a discovered root as needing a mapping decision.
+
+    A blocked or unreadable scan must stay blocked: promoting it to
+    ``pending_mapping`` would present a secrets-containing or unreadable source
+    as something the user may simply confirm and start syncing.
+    """
+    if report.status in BLOCKING_SCAN_STATUSES:
+        return report
+    return SourceReport(**{**asdict(report), "status": "pending_mapping", "detail": detail})
+
+
 def discover(config: DeviceConfig) -> dict[str, Any]:
     """Discover configured mappings plus likely tool roots needing mapping."""
     raw = config.raw
@@ -86,8 +102,8 @@ def discover(config: DeviceConfig) -> dict[str, Any]:
                 for candidate in sorted(projects.iterdir()):
                     memory = candidate / "memory"
                     if memory.is_dir() and memory not in mapped_claude:
-                        reports.append(scan_source(memory, source_id=f"claude-unmapped:{candidate.name}", tool="claude", project_id=None, version=claude_version))
-                        reports[-1] = SourceReport(**{**asdict(reports[-1]), "status": "pending_mapping"})
+                        found = scan_source(memory, source_id=f"claude-unmapped:{candidate.name}", tool="claude", project_id=None, version=claude_version)
+                        reports.append(_as_candidate(found, found.detail or "New Claude project memory; confirm to start syncing"))
             except OSError as error:
                 reports.append(SourceReport("claude-projects", "claude", "unreadable", str(projects), None, 0, (), version=claude_version, detail=str(error)))
         else:
@@ -101,7 +117,7 @@ def discover(config: DeviceConfig) -> dict[str, Any]:
             candidate = claude_root / relative
             if candidate.exists() and candidate not in mapped_paths:
                 discovered = scan_source(candidate, source_id=f"claude-candidate:{relative}", tool="claude", version=claude_version)
-                reports.append(SourceReport(**{**asdict(discovered), "status": "pending_mapping", "detail": f"Potential Claude source; confirm mapping (scan={discovered.status})"}))
+                reports.append(_as_candidate(discovered, f"Potential Claude source; confirm mapping (scan={discovered.status})"))
 
     codex_memory = config.path("codex_memory")
     if codex_memory is None:
@@ -114,7 +130,7 @@ def discover(config: DeviceConfig) -> dict[str, Any]:
             candidate = codex_root / relative
             if candidate.exists() and candidate.resolve() != (codex_memory.resolve() if codex_memory else None):
                 discovered = scan_source(candidate, source_id=f"codex-candidate:{relative}", tool="codex", version=codex_version)
-                reports.append(SourceReport(**{**asdict(discovered), "status": "pending_mapping", "detail": f"Potential Codex source; export/reference only until mapped (scan={discovered.status})"}))
+                reports.append(_as_candidate(discovered, f"Potential Codex source; export/reference only until mapped (scan={discovered.status})"))
 
     for item in raw.get("additional_sources", []):
         path = config.path_value(item["path"])

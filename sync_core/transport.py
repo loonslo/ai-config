@@ -2,12 +2,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 import re
 from pathlib import Path
 import subprocess
 from typing import Iterable
 
 from .utils import SECRET
+
+#: A remote that asks for credentials must never block a sync.
+_GIT_ENV = {
+    **os.environ,
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_ASKPASS": "",
+    "GCM_INTERACTIVE": "never",
+}
 
 
 class TransportPending(RuntimeError):
@@ -31,9 +40,11 @@ def _run(root: Path, *args: str, check: bool = True) -> str:
         text=True,
         encoding="utf-8",
         errors="replace",
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
+        env=_GIT_ENV,
     )
     if check and completed.returncode:
         # Git stderr can include credential-helper or remote URLs.  Keep it out
@@ -144,7 +155,7 @@ class GitTransport:
                 raise ValueError("Potential secret in staged content; publishing blocked")
         if staged:
             _run(self.root, "commit", "-m", message)
-        commit = _run(self.root, "rev-parse", "HEAD", check=False) or None
+        commit = _run(self.root, "rev-parse", "--verify", "--quiet", "HEAD", check=False) or None
         return commit, staged
 
     def remote_head(self) -> str | None:
@@ -161,7 +172,7 @@ class GitTransport:
         if not advertised:
             return None
         _run(self.root, "fetch", "origin", "main")
-        return _run(self.root, "rev-parse", "refs/remotes/origin/main", check=False) or advertised
+        return _run(self.root, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/main", check=False) or advertised
 
     def _is_ancestor(self, older: str, newer: str) -> bool:
         return subprocess.run(["git", "-C", str(self.root), "merge-base", "--is-ancestor", older, newer], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
@@ -198,4 +209,4 @@ class GitTransport:
         self.validate()
         self.ensure_clean()
         _run(self.root, "pull", "--ff-only")
-        return _run(self.root, "rev-parse", "HEAD", check=False)
+        return _run(self.root, "rev-parse", "--verify", "--quiet", "HEAD", check=False)

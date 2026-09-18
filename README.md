@@ -1,173 +1,126 @@
-# 三台设备的 AI 配置与自动记忆同步
+# 三台设备的 AI 配置同步
 
-支持 Windows 原生 Python 和 macOS Python。要求 Python 3.11+，开发使用 3.14。
+让两台 Windows 和一台 Mac 共用同一份 AI 工具配置。日常只需要一条命令，不需要手工编辑 JSON，也不需要理解 Git 内部结构。
 
-| 内容 | 维护位置 | 同步方式 |
+要求 Python 3.11 或更高版本（开发使用 3.14）。支持 Windows 原生 Python 与 macOS Python。
+
+## 能做什么
+
+| 能力 | 说明 | 是否必需 |
 | --- | --- | --- |
-| 全局规则、工具默认值 | ai-config | Git 拉取后应用 |
-| 项目开发规则 | 各项目 AGENTS.md / CLAUDE.md | 随代码同步 |
-| Claude 自动记忆 | 独立私有 ai-memory | 三方文件合并、Git 传输 |
-| Codex 自动记忆 | ai-memory/codex/设备标识/ | 导出快照，全局规则引导按需读取 |
-| 路径、设备差异 | 本机 device.json，已忽略 | 分别设置 |
-| 凭据、登录、聊天数据库、插件运行状态 | 工具本机目录 | 不进入 Git |
+| 配置同步 | 公共规则和选定的工具设置在三台设备间保持一致 | 必需 |
+| 环境检测 | 自动找到 Python、Git 和已安装的工具目录 | 必需 |
+| 状态总览 | 用中文说明本机是否已应用、哪些设备待更新 | 必需 |
+| 差异处理 | 工具界面改过的字段由你决定共享还是只留本机 | 需要时 |
+| 撤销应用 | 按操作记录撤回上一次配置应用 | 需要时 |
+| 记忆同步 | Claude 记忆双向同步，Codex 只导出参考快照 | 可选，不启用不影响配置 |
+| 项目接续 | 在新设备上读取某个项目的最近交接 | 可选 |
 
-Codex 快照是跨设备参考资料，**不是已经验证的原生记忆数据库导入**。脚本不回填 Codex 原生 memories，不做 Claude/Codex 语义转换，不保证工具记录所有聊天。当前为显式同步命令，不安装后台监听服务。
+配置同步**不依赖记忆功能**。只想统一配置时，不需要创建记忆仓库，也不会看到与记忆相关的错误。
 
-## 实施范围与可靠性边界
+## 三分钟上手
 
-当前版本已完成并以隔离测试验证的能力包括：计划哈希与来源树重验、统一设备锁、可恢复事务、不可变 objects／snapshots、Claude 三方记忆合并、start 前本机快照、交接完整性与配置版本核对、来源盘点、doctor，以及保守 Git 传输。冲突、来源消失、基线消失、路径碰撞、未确认推送及 dirty 工作区都会停止或标记 pending；这不是三台真实设备验收。
+### 第一步：第一台设备
 
-P3（三台真机、新会话读取、私有远端及独立加密备份）尚未在本仓库内宣告完成；需要用户提供两个远端、另外两台设备的实际路径与加密备份目的地。Codex 导出仍是参考快照，不是原生记忆数据库导入。
-
-核心资料位于 `sync_core/`，格式定义位于 `schemas/`：
-
-```text
-ai-memory/
-  registry/projects.json
-  objects/<sha256>.md
-  snapshots/<device>/<uuid>.json
-  heads/<device>/<scope>.json
-  integrated/<project>/<branch-id>/MEMORY.md
-  handoffs/<project>/<uuid>.json|md
-```
-
-快照先写入不可变内容物，再写入带 `schema_version`、父快照、来源状态、文件哈希、删除记录和 manifest 哈希的清单。正常删除最后一份文件会产生有父版本的空清单；来源目录消失只报 unavailable，不生成删除事件。
-
-## 主要命令
-
-所有命令默认只预览；只有加上 `--apply` 才会写入。每次写入前都会重验计划当时的文件／来源树哈希。
+Windows 在项目目录运行：
 
 ```text
-python scripts/sync.py quick [--local device.json] [--apply]
-python scripts/sync.py doctor --local device.json
-python scripts/sync.py doctor --local device.json --recover  # explicit rollback review
-python scripts/sync.py inventory --local device.json [--apply]
-python scripts/sync.py rules --local device.json [--apply]
-python scripts/sync.py config --local device.json [--apply]
-python scripts/sync.py memory --local device.json [--apply]
-python scripts/sync.py finish --project <id> --handoff <handoff.md> --local device.json [--apply]
-python scripts/sync.py start --project <id> --handoff-id <id> --local device.json [--apply]
-python scripts/sync.py restore --snapshot <id> --local device.json [--apply]
+.\ai-config.ps1 setup
 ```
 
-想快速开始时，直接运行 `python scripts/sync.py quick` 做只读盘点；确认输出后运行 `python scripts/sync.py quick --apply`。它会自动使用标准的 Codex／Claude 目录，必要时生成一个已被 Git 忽略的本机 `device.json`，并只应用公共规则。默认不复制凭据、不写入完整工具配置、不同步记忆；要启用记忆，之后再手动配置 `memories` 和私有 `ai-memory` 仓库。
-
-`inventory` 会把来源区分为 `normal`、`normal_but_empty`、`missing`、`unreadable`、`blocked_secret`、`pending_mapping`、`not_configured`、`intentionally_excluded` 等状态；新来源不会被静默跳过。`doctor` 只读并列出需要处理的事务与来源状态。
-
-`finish` 要求 device 设置中的 `projects.<id>`、`memories[].id` 与交接文件同时存在。它依次采集稳定来源、保存快照、登记项目、保存交接，再做 Git 推送确认；缺少必要交接字段、代码 dirty、远端不存在或推送失败均不会报 ready。交接文件可由 `templates/handoff.md` 复制。
-
-`start` 会先稳定采集并保存本机记忆快照，再以交接快照的父版本为基线做三方合并；本机新增会保留，修改／删除冲突会停止，普通 start 不会删除本机已有文件。合并结果和基线标记一起进入事务；它不会自动切换分支、丢弃工作区或执行项目脚本。`restore` 只恢复指定快照，验证哈希后才预览／备份／写入，不会推送或改动远端最新状态。
-
-应用命令退出码固定为：`0` 表示合法预览或已完成，`2` 表示交接／配置／来源尚不具备接续条件，`3` 表示待上载或网络问题，`4` 表示冲突，`1` 表示其他错误。预览返回 `0` 不代表可以接续；请检查输出中的 `status`、`ready` 和阻塞项。
-
-`finish --apply` 要求 ai-config 工作区干净且当前 commit 已在其远端分支确认，并保存共享规则、受管字段选择及模板摘要。`start` 会核对这些配置事实；Windows／macOS 的本机路径仍留在各自 device 文件，不参与配置版本相等判断。`additional_sources` 可显式登记自定义或子代理来源；未登记但在已知工具根目录发现的候选会显示为 `pending_mapping`。
-
-## 首次设置
+macOS 首次使用先赋予执行权限：
 
 ```text
-python -m pip install -r requirements.txt
+chmod +x ai-config.command
+./ai-config.command setup
 ```
 
-macOS 如只有 python3，将命令中的 python 替换为 python3。最短首次设置路径是：
+不带 `--apply` 时只做只读检测，会列出检测到的系统和工具目录，不写入任何文件。确认输出无误后：
 
 ```text
-python scripts/sync.py quick
-python scripts/sync.py quick --apply
+.\ai-config.ps1 setup --apply
 ```
 
-需要记忆映射或自定义路径时，再复制 `examples/device.remote.json` 为 `device.json`（或放在仓库外，通过 `--local` 指定）并按下文填写。
+它会为本机生成一份配置文件（默认在仓库根目录的 `device.json`，已被 Git 忽略）。**你不需要编辑这个文件。**
 
-- 三台设备使用不同 device，例如 windows-a、windows-b、mac。
-- state_dir 保存本机基线和备份，不同步、不删除。
-- memory_repo 必须在 ai-config 外，三台电脑使用同一私有远程的各自克隆。
-- 使用自定义 CODEX_HOME / CLAUDE_CONFIG_DIR 时，填写真实工具目录。
-- codex_keys / claude_keys 选择共享字段，未选择的字段保留。
-- codex_overrides / claude_overrides 保存本机参数，不填凭据。
-- 不使用某工具时删除对应字段；没有 Codex 记忆目录时删除 codex_memory。
+已有配置不会被丢弃：写入前会先备份，并告诉用户备份位置。
 
-在 memories 数组添加项目映射，下面路径需要替换为本机真实路径：
+### 第二步：第二台设备
 
-```json
-{
-  "id": "langchain-learning",
-  "path": "~/.claude/projects/本机项目目录名/memory"
-}
-```
+在第二台设备上克隆同一个配置源，然后运行同样的 `setup --apply`。设备 ID 自动生成，不会和已有设备冲突；同名或 ID 冲突时会明确停止，而不是覆盖。
 
-同一项目三台设备 id 相同、path 可以不同。不同项目不得共用 id。首次向新设备导入到尚不存在的目录，可加 initialize: true；曾同步过的本机目录整体消失会报错，不推断为删除全部记忆。
+### 第三步：修改一次并同步
 
-记忆中发现凭据时同步停止，不输出匹配内容。需要保留本机原文但排除同步，可在该项目条目添加 `"exclude": ["相对文件名.md"]`。排除列表需在各设备配置；已进入共享历史的敏感文件不能仅靠排除解决。索引若引用被排除文件，其他电脑无法读取该条目。
-
-## 全局规则和配置
+在任意一台设备上改好共享内容后：
 
 ```text
-python scripts/sync.py rules --local device.json
-python scripts/sync.py rules --local device.json --apply
-python scripts/sync.py config --local device.json
-python scripts/sync.py config --local device.json --apply
+.\ai-config.ps1 sync            # 预览：会写哪些文件
+.\ai-config.ps1 sync --apply    # 应用
 ```
 
-默认只读预览，列出精确目标，不输出敏感正文。rules 保留原全局文件，在受管区块生成 common/ 全部主题，避免悬空引用。首次迁移后可将旧共享规则整理进 common/，本机规则留在区块外。受管区块被本机直接修改时，后续覆盖会停止。
-
-config 只更新选中字段。Codex TOML 保留其他字段和注释，Claude JSON 保留其他键。MCP、提供商、Windows 沙盒等未选择字段保持本机值。当前不自动转换 codex/mcp.json，也不假定清单中的 ${变量} 会自动展开。
-
-Windows 旧入口 scripts/link-global.ps1 的 Preview / Apply 仍可用，现为 Python 包装，不再创建链接。已有符号链接需先人工迁移为普通文件，脚本会拒绝跟随链接写入。
-
-每批变更先备份并写入事务日志，普通异常会回滚已写入文件；进程中断则由 `doctor` 识别并提供恢复选项。没有变化则不写文件。应用后启动新工具会话。
-
-## 自动记忆
-
-先关闭可能写入记忆的会话，等待后台更新完成。没有远程仓库时先初始化本地目录：
+如果这次修改是在本机用 `diff --choice share` 保存的（或者你想把自己配置源副本里的共享修改发出去），发布是单独的一步：
 
 ```text
-python scripts/git-memory.py init --local device.json
-python scripts/sync.py memory --local device.json
-python scripts/sync.py memory --local device.json --apply
+.\ai-config.ps1 sync --publish --apply   # 先把共享修改提交并推送到配置源远端，再应用到本机
 ```
 
-自动采集 Markdown，无需手工提炼。Claude 本机目录与 ai-memory/claude/项目标识/ 双向同步，Codex 只更新自己的设备快照。绝对路径不盲目替换，读取远端记忆时应使用当前项目路径。
-
-在托管平台创建**私有空仓库**后，在 memory_repo 目录添加远程：
+在另一台设备上加 `--fetch` 同步，即可拿到这次修改：
 
 ```text
-git remote add origin <你的私有仓库地址>
+.\ai-config.ps1 sync --fetch --apply
 ```
 
-需要发布时运行（会提交并推送）：
+每次同步都会分别打印四行结果：**下载共享配置 / 远端发布 / 本机应用 / 状态上报**。四件事各自独立，不会互相代替。
+
+### 第四步：确认状态
 
 ```text
-python scripts/git-memory.py push --local device.json
+.\ai-config.ps1 status
 ```
 
-推送前检查当前文件，仅允许 claude/、codex/ 下 Markdown；不强制推送。敏感检测是启发式，首次发布应审查内容，历史提交也不得含凭据。
-
-另一台电脑克隆该仓库，设置本机映射后：
+输出示例：
 
 ```text
-python scripts/git-memory.py pull --local device.json
-python scripts/sync.py memory --local device.json
-python scripts/sync.py memory --local device.json --apply
+设备：windows-a
+配置源：git（已确认）
+共享版本：a30c5a6fcda9
+本机配置状态：已应用
+  codex · AGENTS.md：已应用（受管：rules）
+  codex · config.toml：已应用（受管：approval_policy）
+最近成功应用时间：2026-09-15T12:30:57+00:00
+下一步：无需操作。
 ```
 
-推荐工作结束后同步并推送，另一台开始前拉取并同步。本地记忆仓库有修改时 pull 拒绝；远端分叉时只允许快进，不自动解决。先保留本地提交，人工合并 Git 冲突，再重新 memory 预览。
+如果显示“需要启动新会话”，说明文件已经写好并核对过，但工具要重开才会加载。这两件事是分开的，脚本不会把前者说成后者。
 
-文件双方都改过时整批停止，保留双方原文；人工合并成一致内容后重试。正常文件删除通过本机基线传播；删除/修改冲突也停止。不要删整个目录模拟删除全部记忆。
+## 命令速查
 
-## 项目配置维护
+默认输出中文。加 `--json` 得到机器可读结果，加 `--verbose` 查看脱敏技术详情。
 
-templates/project/ 提供两个入口，复制到新项目后填写真实运行、测试命令，随项目提交。项目规则独立演进，全局模板升级不会覆盖它。个人自动记忆保存在 ai-memory，不进入团队项目。大型项目按模块增加 AGENTS.md。
+| 命令 | 读 / 写 | 用途 |
+| --- | --- | --- |
+| `setup` | 检测只读；`--apply` 写本机配置 | 首次设置、加入已有配置源 |
+| `sync` | 预览只读；`--apply` 写目标文件 | 日常同步；`--fetch` 下载配置源，`--publish` 发布本机共享修改 |
+| `status` | 只读 | 查看本机状态和其他设备回执 |
+| `diff` | 只读；`--apply` 保存选择 | 查看字段差异并决定归属 |
+| `undo` | 只读；`--apply` 恢复 | 按操作撤销上一次配置应用 |
+| `memory-setup` | 只读；`--apply` 保存映射 | 可选：启用记忆同步 |
+| `project` | 只读 | 可选：查看项目交接 |
+| `doctor` | 只读（`--recover` 才写） | 检查来源与未完成事务 |
 
-指令文档与工具参数的优先级不同。Codex 项目 .codex/config.toml 需项目受信任才加载；不要把个人默认习惯重复复制到所有项目。
+稳定的退出码：`0` 正常或预览、`2` 尚未具备条件、`3` 待上报或网络问题、`4` 冲突、`1` 其他错误。**预览返回 `0` 不代表已经应用**，请以输出中的状态文字为准。
 
-## 恢复和验证
+## 进一步阅读
 
-备份位于 `state_dir/backups/<operation-id>/`，事务日志位于 `state_dir/transactions/`。`doctor` 会识别中断事务；先检查 journal 的 `ROLLBACK_REQUIRED`、外部修改和备份，再重新执行或人工恢复，不能只删除锁文件。备份仅留本机。
+- [入门详解](docs/getting-started.md)：每一步在做什么，以及为什么这样设计。
+- [遇到问题](docs/troubleshooting.md)：常见错误编号、含义和处理方式。
+- [高级说明](docs/advanced.md)：目录格式、快照与事务、兼容入口、共享字段清单。
+- [验收记录](docs/acceptance.md)：三台实机的验收清单与结果。
 
-```text
-python -m pytest -q
-python scripts/check-secrets.py
-```
+## 边界说明
 
-测试覆盖三方合并、最后文件删除、冲突、NFC／大小写／文件目录碰撞、计划失效、原规则保留、配置字段保留、异常回滚、快照不可变性和 Git 传输。macOS 真机、私有远程和新会话读取需接入后验收，不能把文件同步成功等同于模型采用全部记忆。
-
-参考：[Claude 自动记忆](https://code.claude.com/docs/en/memory)、[Codex 记忆](https://learn.chatgpt.com/zh-Hans/docs/customization/memories)。
+- Codex 快照是**跨设备参考资料**，不是已经验证的原生记忆数据库导入。脚本不回填 Codex 原生记忆，不做 Claude/Codex 语义转换。
+- 敏感信息（凭据、登录、会话、Cookie）永不进入共享字段集合；配置里出现这类字段会被直接拒绝。记忆中发现凭据时同步停止，且不输出匹配内容。
+- 当前是显式同步命令，不安装后台监听服务。
+- 跨设备同步成功不等于模型已经采用共享内容；工具需要新会话加载。
+- 真实三机验收需要两台 Windows 和一台 Mac 实机，不能用 Windows 目录模拟 Mac。

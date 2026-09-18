@@ -138,15 +138,19 @@ def test_finish_publishes_only_after_code_and_memory_confirmation(tmp_path, monk
     assert payload["status"] == "uploaded"
     assert payload["transport"] == "uploaded"
     assert json.loads((memory_repo / "heads/windows-a/project.json").read_text())["status"] == "uploaded"
-    report = sync_script.start_report(memory_repo, "project", payload["handoff_id"], project, current_config=sync_script._config_facts())
+    report = sync_script.start_report(memory_repo, "project", payload["handoff_id"], project, current_config=sync_script._config_facts(config))
     assert report["ready"] is True
-    changed_config = sync_script._config_facts()
-    changed_config["codex_keys"] = []
+    changed_config = sync_script._config_facts(config)
+    # The managed field selection is part of the configuration content version;
+    # a different selection must be detected as a mismatch.  The baseline facts
+    # are derived from the device configuration, so an unmanaged change is
+    # simulated by altering the field selection explicitly.
+    changed_config["codex_keys"] = ["web_search"]
     mismatched_config = sync_script.start_report(memory_repo, "project", payload["handoff_id"], project, current_config=changed_config)
     assert mismatched_config["ready"] is False
     assert mismatched_config["checks"]["config_matches"] is False
     (memory_repo / "handoffs/project" / f"{payload['handoff_id']}.md").write_text("tampered")
-    tampered = sync_script.start_report(memory_repo, "project", payload["handoff_id"], project, current_config=sync_script._config_facts())
+    tampered = sync_script.start_report(memory_repo, "project", payload["handoff_id"], project, current_config=sync_script._config_facts(config))
     assert tampered["ready"] is False
     assert tampered["checks"]["handoff_document_hash"] is False
 
@@ -378,7 +382,7 @@ def test_cli_missing_handoff_is_incomplete_exit(tmp_path):
     result = subprocess.run(
         ["python", str(script), "start", "--local", str(config), "--project", "project", "--handoff-id", "missing"],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
     )
     assert result.returncode == 2
 
@@ -424,7 +428,7 @@ none
     result = subprocess.run(
         ["python", str(script), "finish", "--apply", "--local", str(config), "--project", "project", "--handoff", str(handoff)],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
     )
     assert result.returncode == 2
     assert '"status": "incomplete"' in result.stdout

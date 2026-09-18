@@ -90,7 +90,7 @@ def test_transport_preserves_local_commit_on_true_divergence(tmp_path):
     with pytest.raises(TransportPending):
         GitTransport(a).push_confirmed()
     assert (a / "claude/project/MEMORY.md").read_text() == "local branch"
-    assert subprocess.check_output(["git", "-C", str(a), "log", "-1", "--format=%s"], text=True).strip() == "Sync automatic memory"
+    assert subprocess.check_output(["git", "-C", str(a), "log", "-1", "--format=%s"], text=True, encoding="utf-8", errors="replace").strip() == "Sync automatic memory"
 
 
 def test_git_memory_cli_returns_pending_exit_code_on_divergence(tmp_path):
@@ -114,7 +114,7 @@ def test_git_memory_cli_returns_pending_exit_code_on_divergence(tmp_path):
     config = external / "device.json"
     config.write_text(json.dumps({"memory_repo": str(a), "state_dir": str(external / "state")}))
     script = Path(__file__).parents[1] / "scripts/git-memory.py"
-    result = subprocess.run(["python", str(script), "push", "--local", str(config)], capture_output=True, text=True)
+    result = subprocess.run(["python", str(script), "push", "--local", str(config)], capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert result.returncode == 3
     assert json.loads((external / "state/transport.json").read_text())["status"] == "pending"
     shutil.rmtree(external, ignore_errors=True)
