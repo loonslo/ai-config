@@ -420,8 +420,7 @@ def render(report: Mapping[str, Any]) -> str:
         state = "本机已登记" if row["managed"] else "本机未登记"
         if not row.get("root_exists"):
             state += "（配置目录不存在）"
-        label = row["name"] if row["instance"] in row["name"] else f"{row['name']}（{row['instance']}）"
-        lines.append(f"  {label}  {row['root']}  {state}")
+        lines.append(f"  {agents.label(row['instance'])}  {row['root']}  {state}")
         rules = row.get("rules")
         if rules:
             if rules.get("state") == "unresolved":

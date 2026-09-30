@@ -365,6 +365,12 @@ def display_name(instance_id: str) -> str:
     return profile.name
 
 
+def label(instance_id: str) -> str:
+    """Name plus the id a user types in commands, without repeating the id."""
+    name = display_name(instance_id)
+    return name if instance_id in name else f"{name}（{instance_id}）"
+
+
 # --------------------------------------------------------------------------
 # Host environment
 # --------------------------------------------------------------------------

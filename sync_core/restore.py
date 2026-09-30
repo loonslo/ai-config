@@ -38,14 +38,24 @@ def _journals(state_dir: Path) -> list[dict[str, Any]]:
     return records
 
 
-def recent_operations(state_dir: Path, *, limit: int = 10, operation_filter: str | None = "config") -> list[dict[str, Any]]:
+#: Operations a user can undo: configuration applies, migrations and detaches.
+UNDOABLE_OPERATIONS = ("config", "migrate", "detach")
+
+
+def recent_operations(
+    state_dir: Path,
+    *,
+    limit: int = 10,
+    operation_filter: str | tuple[str, ...] | None = UNDOABLE_OPERATIONS,
+) -> list[dict[str, Any]]:
     """List recent applies as time, tool and change count — no UUID required."""
+    allowed = (operation_filter,) if isinstance(operation_filter, str) else operation_filter
     listing: list[dict[str, Any]] = []
     for journal in _journals(state_dir):
         if journal.get("status") != "COMMITTED":
             continue
         operation = (journal.get("metadata") or {}).get("operation", "")
-        if operation_filter and operation and operation != operation_filter:
+        if allowed and operation and operation not in allowed:
             continue
         changes = journal.get("changes", [])
         path_agents = (journal.get("metadata") or {}).get("path_agents") or {}
@@ -78,7 +88,8 @@ def _tool_for(path: str) -> str | None:
 def _statement(journal: Mapping[str, Any], tools: list[str], count: int) -> str:
     when = str(journal.get("created_at", ""))[:19].replace("T", " ")
     tool_text = "、".join(tools) if tools else "配置"
-    return f"{when} 对 {tool_text} 应用了 {count} 处更改"
+    verb = {"migrate": "迁入", "detach": "退出接管"}.get(str((journal.get("metadata") or {}).get("operation")), "应用")
+    return f"{when} 对 {tool_text} {verb}了 {count} 处更改"
 
 
 def select_operation(state_dir: Path, *, operation_id: str | None = None, index: int | None = None) -> dict[str, Any]:
@@ -166,8 +177,8 @@ def restore(
 ) -> dict[str, Any]:
     """Restore the managed fields to the selected operation's prior state."""
     operation = select_operation(state_dir, operation_id=operation_id, index=index)
-    if operation.get("operation") != "config":
-        raise RestoreError("该记录不是配置应用，不能用配置恢复处理。")
+    if operation.get("operation") not in UNDOABLE_OPERATIONS:
+        raise RestoreError("该记录不是配置应用、迁入或退出接管，不能用配置恢复处理。")
     plan = plan_restore(state_dir, operation)
     result = {
         "status": "preview",

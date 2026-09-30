@@ -163,6 +163,10 @@ def code_facts_for_project(root: Path) -> tuple[CodeFacts, str | None]:
     return code_facts(root), None
 
 
+#: Store files that are part of the configuration only when present.
+OPTIONAL_STORE_FILES = ("common/imported.md", "agents.toml")
+
+
 def configuration_facts(root: Path, *, codex_keys: tuple[str, ...] = (), claude_keys: tuple[str, ...] = ()) -> dict[str, Any]:
     """Capture only portable ai-config facts, never local paths or credentials.
 
@@ -180,6 +184,12 @@ def configuration_facts(root: Path, *, codex_keys: tuple[str, ...] = (), claude_
     for relative in [*(f"common/{name}.md" for name in SHARED_RULE_TOPICS), "codex/config.toml", "claude/settings.shared.json"]:
         path = root / relative
         files[relative] = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+    # Optional store files join the version only once they exist, so a store
+    # without them keeps the configuration version it always had.
+    for relative in OPTIONAL_STORE_FILES:
+        path = root / relative
+        if path.exists():
+            files[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
     portable = {"schema_version": 1, "commit": commit, "branch": branch, "remote": remote, "remote_commit": remote_commit, "files": files, "codex_keys": sorted(codex_keys), "claude_keys": sorted(claude_keys)}
     portable["version"] = configuration_content_version(portable)
     portable["dirty_files"] = list(dirty)
