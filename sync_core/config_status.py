@@ -2,9 +2,9 @@
 
 The source repository being consistent says nothing about what the tools
 actually loaded.  This module reads the managed content out of the real target
-files (``AGENTS.md``, ``CLAUDE.md``, ``config.toml``, ``settings.json``), compares
-only the managed projection, and reports missing, malformed, locally modified,
-pending and applied states.
+files (every agent's rules entry from ``sync_core.agents``, plus ``config.toml``
+and ``settings.json``), compares only the managed projection, and reports
+missing, malformed, locally modified, pending and applied states.
 
 Callers must re-read a target after applying and confirm the write; a failed
 read-back never produces a success receipt.
@@ -101,18 +101,20 @@ def _json_managed_projection(data: bytes | None, keys: tuple[str, ...]) -> tuple
 
 
 def scope_targets(raw: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Describe every target file this device manages, without reading it yet."""
+    """Describe every target file this device manages, without reading it yet.
+
+    Rules entries come from the agent registry, so every agent instance is
+    verified by the same code that plans its write.
+    """
+    from .agents import managed_targets
     from .config import absolute
 
     targets: list[dict[str, Any]] = []
-    for tool, filename in (("codex", "AGENTS.md"), ("claude", "CLAUDE.md")):
-        root = raw.get(tool)
-        if not root:
-            continue
+    for instance, entry in managed_targets(raw):
         targets.append({
-            "tool": tool,
-            "target": str(absolute(root) / filename),
-            "target_kind": "rules_block",
+            "tool": instance.id,
+            "target": str(entry.path),
+            "target_kind": entry.kind,
             "fields": ["rules"],
         })
     if raw.get("codex"):
@@ -141,6 +143,18 @@ def observed_digest(target: Mapping[str, Any], data: bytes | None) -> tuple[str 
         block, error = managed_block(data)
         if error is not None:
             return None, error
+        return digest(block), None
+    if kind == "rules_file":
+        # A file ai-config owns holds nothing but the managed block.  A file
+        # without the block was not created here; extra text next to the block
+        # is a local edit that must be decided on, not silently kept or dropped.
+        block, error = managed_block(data)
+        if error == "no_managed_block":
+            return None, "foreign_file"
+        if error is not None:
+            return None, error
+        if (data[: data.index(block)] + data[data.index(block) + len(block):]).strip():
+            return None, "outside_content"
         return digest(block), None
     if kind == "config":
         return _toml_managed_projection(data, tuple(target.get("fields", [])))
@@ -207,6 +221,10 @@ def _classify(*, expected: str | None, observed: str | None, error: str | None, 
         return "pending_sync", "no managed field is present in the target yet"
     if error == "no_managed_block":
         return "pending_sync", "target has no managed block yet"
+    if error == "foreign_file":
+        return "conflict", "target file exists but was not created by ai-config"
+    if error == "outside_content":
+        return "local_modified", "the ai-config file contains content outside the managed block"
     if error is not None:
         return "apply_failed", error
     if observed is None:

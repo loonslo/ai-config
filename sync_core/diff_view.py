@@ -64,7 +64,11 @@ class FieldDiff:
 
     @property
     def tool_label(self) -> str:
-        return TOOL_LABELS.get(self.tool, self.tool)
+        if self.tool in TOOL_LABELS:
+            return TOOL_LABELS[self.tool]
+        from .agents import display_name
+
+        return display_name(self.tool)
 
     @property
     def choices(self) -> tuple[str, ...]:

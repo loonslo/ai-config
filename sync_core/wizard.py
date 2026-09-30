@@ -97,10 +97,13 @@ def plan_device(
         raise SetupError(f"未知的共享范围：{scope}")
     if not tools:
         raise SetupError("至少需要选择一个工具，或者明确选择仅公共规则。")
+    from .agents import LEGACY_INSTANCES, profile_for_instance
+
     roots = dict(tool_roots or {})
     resolved_tools = sorted(set(tools))
     for tool in resolved_tools:
-        if tool not in {"codex", "claude"}:
+        profile = profile_for_instance(tool)
+        if tool not in LEGACY_INSTANCES and (profile is None or not profile.writable):
             raise SetupError(f"不支持的工具：{tool}")
     config: dict[str, Any] = {
         "device": device_id or stable_device_id(),
@@ -115,18 +118,25 @@ def plan_device(
         "memories": memories or [],
         "projects": {},
     }
+    agents: dict[str, Any] = {}
     for tool in resolved_tools:
         root = roots.get(tool)
         if not root:
             raise SetupError(f"缺少 {tool} 的配置目录。")
-        config[tool] = root
-    if resolved_tools == ["codex"] and scope == SCOPE_RULES_AND_TOOLS:
-        config["codex_keys"] = list(codex_keys or [])
-    if resolved_tools == ["claude"] and scope == SCOPE_RULES_AND_TOOLS:
-        config["claude_keys"] = list(claude_keys or [])
-    if scope == SCOPE_RULES_AND_TOOLS and len(resolved_tools) == 2:
-        config["codex_keys"] = list(codex_keys or [])
-        config["claude_keys"] = list(claude_keys or [])
+        if tool in LEGACY_INSTANCES:
+            config[tool] = root
+        else:
+            # Agents other than Codex/Claude are declared under ``agents``; they
+            # only ever receive the managed rules entry from the registry.
+            agents[tool] = {"root": root}
+    if agents:
+        config["agents"] = agents
+    if scope == SCOPE_RULES_AND_TOOLS:
+        # Tool settings are only ever managed for Codex and Claude.
+        if "codex" in resolved_tools:
+            config["codex_keys"] = list(codex_keys or [])
+        if "claude" in resolved_tools:
+            config["claude_keys"] = list(claude_keys or [])
     if remote_url:
         config["remote_url"] = remote_url
         config["remote_identity"] = identity_of(remote_url)
@@ -168,9 +178,13 @@ def describe_plan(config: Mapping[str, Any]) -> list[str]:
         f"共享配置源：{config.get('remote_identity') or '（未设置，本机先作为第一台设备）'}",
         f"共享记忆仓库：{config['memory_repo']}",
     ]
+    from .agents import display_name
+
     for tool in ("codex", "claude"):
         if config.get(tool):
             lines.append(f"{tool} 配置目录：{config[tool]}")
+    for instance, spec in sorted((config.get("agents") or {}).items()):
+        lines.append(f"{display_name(instance)} 配置目录：{spec.get('root')}（只接管规则入口）")
     lines.append("受管字段：" + ", ".join(f"{tool}={config.get(f'{tool}_keys') or []}" for tool in ("codex", "claude") if config.get(tool)))
     lines.append("记忆同步：" + ("已启用" if config.get("memories") else "未启用（默认）"))
     return lines

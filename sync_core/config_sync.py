@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from . import config_status
-from .config import DeviceConfig, absolute, managed_fields
+from .config import DeviceConfig, managed_fields
 from .status import build_state, capability
 from .transaction import PlannedChanges, SyncLock, transaction
 
@@ -139,15 +139,15 @@ def _expected_projections(config: DeviceConfig) -> dict[tuple[str, str], Any]:
     read-back check.
     """
     from scripts.sync import _rules_body, _source_root
+    from .agents import managed_targets
 
     template_root = Path(_source_root(config.raw))
     projections: dict[tuple[str, str], Any] = {}
-    body = _rules_body(config.raw)
-    block, error = config_status.managed_block(body)
-    rules_projection = block if error is None else body
-    for tool in ("codex", "claude"):
-        if config.raw.get(tool):
-            projections[(tool, "rules_block")] = rules_projection
+    for instance, entry in managed_targets(config.raw):
+        # Each instance renders its own topic selection, exactly as the writer does.
+        body = _rules_body(config.raw, instance)
+        block, error = config_status.managed_block(body)
+        projections[(instance.id, entry.kind)] = block if error is None else body
 
     overrides = effective_overrides(config.raw, config.state_dir)
 
@@ -200,6 +200,12 @@ def build_plan(config: DeviceConfig, *, apply: bool) -> tuple[PlannedChanges, di
         try:
             produced = producer(config.raw, state)
         except ValueError as error:
+            if "not owned by ai-config" in str(error):
+                raise ConfigSyncError(
+                    "resolve",
+                    "目标位置已有一个不是由 ai-config 创建的文件，无法接管；先运行 migrate 处理已有内容。",
+                    exit_code=4,
+                ) from error
             if "edited locally" in str(error) or "Invalid managed block" in str(error):
                 raise ConfigSyncError(
                     "resolve",
@@ -218,6 +224,9 @@ def build_plan(config: DeviceConfig, *, apply: bool) -> tuple[PlannedChanges, di
             if key == "accepted_rules":
                 metadata.setdefault("accepted_rules", [])
                 metadata["accepted_rules"].extend(str(tool) for tool in value)
+            elif key == "path_agents":
+                metadata.setdefault("path_agents", {})
+                metadata["path_agents"].update(value)
     plan = PlannedChanges(changes, expected=expected, state_root=state, metadata=metadata)
     drift = local_drift(config)
     report = {
@@ -777,20 +786,17 @@ def _stage_local_block(config: DeviceConfig, tool: str) -> Path | None:
     device state directory, and the shared source only changes once a human
     merges the prose and publishes it.
     """
+    from .agents import managed_targets
     from .config_status import managed_block
     from .utils import atomic_write
 
-    root = config.raw.get(tool)
-    if not root:
+    entry = next((target for instance, target in managed_targets(config.raw) if instance.id == tool), None)
+    if entry is None or not entry.path.exists():
         return None
-    filename = "AGENTS.md" if tool == "codex" else "CLAUDE.md"
-    target = absolute(root) / filename
-    if not target.exists():
-        return None
-    block, error = managed_block(target.read_bytes())
+    block, error = managed_block(entry.path.read_bytes())
     if error is not None or block is None:
         return None
-    staged = config.state_dir / "rules-share" / f"{tool}-{filename}.block.md"
+    staged = config.state_dir / "rules-share" / f"{tool}-{entry.path.name}.block.md"
     atomic_write(staged, block)
     return staged
 

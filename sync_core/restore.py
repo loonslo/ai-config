@@ -48,7 +48,8 @@ def recent_operations(state_dir: Path, *, limit: int = 10, operation_filter: str
         if operation_filter and operation and operation != operation_filter:
             continue
         changes = journal.get("changes", [])
-        tools = sorted({_tool_for(str(item.get("path", ""))) for item in changes} - {None})
+        path_agents = (journal.get("metadata") or {}).get("path_agents") or {}
+        tools = sorted({path_agents.get(str(item.get("path", ""))) or _tool_for(str(item.get("path", ""))) for item in changes} - {None})
         listing.append({
             "operation_id": journal.get("operation_id"),
             "operation": operation,

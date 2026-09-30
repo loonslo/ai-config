@@ -140,6 +140,9 @@ def validate(raw: dict[str, Any]) -> None:
             raise ValueError(f"Memory mapping needs a path: {item['id']}")
         if not isinstance(item.get("exclude", []), list) or any(not isinstance(v, str) for v in item.get("exclude", [])):
             raise ValueError(f"Memory exclude must be a list of strings: {item['id']}")
+    from .agents import validate_agents
+
+    validate_agents(raw)
 
 
 def schema_version(raw: dict[str, Any]) -> int:
@@ -178,8 +181,15 @@ def _selected(raw: Mapping[str, Any], field: str, allowed: frozenset[str], tool:
 
 
 def enabled_tools(raw: Mapping[str, Any]) -> tuple[str, ...]:
-    """Detect which tool roots this device configured, in stable order."""
-    return tuple(tool for tool in ("codex", "claude") if raw.get(tool))
+    """Every agent instance this device configured, in stable order.
+
+    Codex and Claude keep their top-level fields; other agents are declared
+    under ``agents`` (see ``sync_core.agents``).
+    """
+    from .agents import LEGACY_INSTANCES
+
+    legacy = tuple(tool for tool in LEGACY_INSTANCES if raw.get(tool))
+    return legacy + tuple(sorted((raw.get("agents") or {}).keys()))
 
 
 def managed_fields(raw: Mapping[str, Any]) -> dict[str, list[str]]:
