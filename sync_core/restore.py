@@ -38,8 +38,9 @@ def _journals(state_dir: Path) -> list[dict[str, Any]]:
     return records
 
 
-#: Operations a user can undo: configuration applies, migrations and detaches.
-UNDOABLE_OPERATIONS = ("config", "migrate", "detach")
+#: Operations a user can undo: configuration applies, migrations, detaches and
+#: agent declarations.
+UNDOABLE_OPERATIONS = ("config", "migrate", "detach", "declare")
 
 
 def recent_operations(
@@ -88,7 +89,7 @@ def _tool_for(path: str) -> str | None:
 def _statement(journal: Mapping[str, Any], tools: list[str], count: int) -> str:
     when = str(journal.get("created_at", ""))[:19].replace("T", " ")
     tool_text = "、".join(tools) if tools else "配置"
-    verb = {"migrate": "迁入", "detach": "退出接管"}.get(str((journal.get("metadata") or {}).get("operation")), "应用")
+    verb = {"migrate": "迁入", "detach": "退出接管", "declare": "登记"}.get(str((journal.get("metadata") or {}).get("operation")), "应用")
     return f"{when} 对 {tool_text} {verb}了 {count} 处更改"
 
 

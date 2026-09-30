@@ -190,13 +190,23 @@ def _historical_body(root: Path) -> bytes:
     return b"<!-- ai-config:begin -->" + b"\n" + ("\n\n".join(parts) + "\n").encode("utf-8") + b"<!-- ai-config:end -->"
 
 
-def test_codex_and_claude_render_byte_identical_rules(tmp_path):
+def _without_version_line(body: bytes) -> bytes:
+    """Drop the single version paragraph the load check added to the block."""
+    text = body.decode("utf-8")
+    lines = [line for line in text.split("\n\n") if not line.startswith("ai-config 规则版本：")]
+    assert len(lines) == len(text.split("\n\n")) - 1, "exactly one version line"
+    return "\n\n".join(lines).encode("utf-8")
+
+
+def test_codex_and_claude_render_the_historical_rules_plus_one_version_line(tmp_path):
     store = write_store(tmp_path / "store")
     raw = device_raw(tmp_path, store, legacy={"codex": tmp_path / "codex", "claude": tmp_path / "claude"})
     expected = _historical_body(store)
-    for instance in agents.agent_instances(raw):
-        assert sync_script._rules_body(raw, instance) == expected
-    assert sync_script._rules_body(raw) == expected
+    rendered = {sync_script._rules_body(raw, instance) for instance in agents.agent_instances(raw)}
+    rendered.add(sync_script._rules_body(raw))
+    assert len(rendered) == 1  # Codex, Claude and the default render the same block
+    (body,) = rendered
+    assert _without_version_line(body) == expected
 
 
 def test_an_applied_legacy_device_sees_zero_changes(tmp_path):
@@ -209,7 +219,7 @@ def test_an_applied_legacy_device_sees_zero_changes(tmp_path):
     report = config_sync.sync(device, apply=True)
     assert report["verified"] is True
     agents_md = (tmp_path / "codex" / "AGENTS.md").read_bytes()
-    assert agents_md == b"# mine\n" + b"\n\n" + _historical_body(store) + b"\n"
+    assert agents_md == b"# mine\n" + b"\n\n" + sync_script._rules_body(raw) + b"\n"
     plan, _ = config_sync.build_plan(device, apply=True)
     assert len(plan) == 0
 

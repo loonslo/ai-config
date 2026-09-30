@@ -171,12 +171,16 @@ def shared_receipt(state: Mapping[str, Any]) -> dict[str, Any]:
     for target in managed.get("targets", []):
         if not isinstance(target, Mapping):
             continue
-        targets.append({
+        entry = {
             "tool": target.get("tool"),
             "target_kind": target.get("target_kind"),
             "expected_digest": target.get("expected_digest"),
             "status": target.get("status"),
-        })
+        }
+        if "load_check" in target:
+            # Only the outcome travels; the answer and the check time stay local.
+            entry["load_verified"] = target.get("load_check") == "verified"
+        targets.append(entry)
     receipt = {
         "schema_version": 1,
         "device_id": state.get("device_id"),

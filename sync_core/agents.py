@@ -537,15 +537,69 @@ def _topics(values: Iterable[str] | None, profile: AgentProfile) -> tuple[str, .
     return tuple(topic for topic in SHARED_RULE_TOPICS if topic in chosen)
 
 
+#: Optional file in the configuration store: shared topic choices per agent.
+STORE_PREFERENCES = "agents.toml"
+
+
+def store_preferences(store_root: Path) -> dict[str, tuple[str, ...]]:
+    """Topic choices shared through the store's ``agents.toml``.
+
+    Keys are profile ids (``workbuddy``) or instance ids (``workbuddy-ai``); an
+    instance entry wins over its profile's.  The file is optional and strict: a
+    typo stops the sync instead of silently sending the wrong rules.
+    """
+    import tomllib
+
+    from .config import SHARED_RULE_TOPICS
+
+    path = store_root / STORE_PREFERENCES
+    if not path.is_file():
+        return {}
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise ValueError(f"agents.toml cannot be parsed: {error}") from error
+    result: dict[str, tuple[str, ...]] = {}
+    for key, section in data.items():
+        if key not in PROFILES and profile_for_instance(key) is None:
+            raise ValueError(f"agents.toml names an unknown agent: {key}")
+        if not isinstance(section, dict) or set(section) - {"topics"}:
+            raise ValueError(f"agents.toml [{key}] only supports topics")
+        topics = section.get("topics")
+        if not isinstance(topics, list) or not topics or any(not isinstance(item, str) for item in topics) or len(set(topics)) != len(topics):
+            raise ValueError(f"agents.toml [{key}].topics must be a non-empty list of unique topic names")
+        unknown = sorted(set(topics) - set(SHARED_RULE_TOPICS))
+        if unknown:
+            raise ValueError(f"agents.toml [{key}].topics has unknown topics: {', '.join(unknown)}")
+        result[key] = tuple(topics)
+    return result
+
+
+def _store_root(raw: Mapping[str, Any]) -> Path:
+    from .config_source import source_root
+
+    return Path(source_root(raw))
+
+
+def _chosen_topics(spec_topics: Iterable[str] | None, preferences: Mapping[str, tuple[str, ...]], instance_id: str, profile: AgentProfile) -> tuple[str, ...]:
+    """Device choice, then the store's shared choice, then the built-in default."""
+    if spec_topics is not None:
+        return _topics(spec_topics, profile)
+    shared = preferences.get(instance_id) or preferences.get(profile.id)
+    return _topics(shared, profile)
+
+
 def agent_instances(raw: Mapping[str, Any]) -> list[AgentInstance]:
     """Every agent instance this device manages, in a stable order."""
     from .config import absolute
 
+    preferences = store_preferences(_store_root(raw))
     instances: list[AgentInstance] = []
     for legacy in LEGACY_INSTANCES:
         if raw.get(legacy):
             profile = PROFILES[legacy]
-            instances.append(AgentInstance(legacy, profile, absolute(raw[legacy]), _topics(None, profile), profile.rules, True))
+            topics = _chosen_topics(None, preferences, legacy, profile)
+            instances.append(AgentInstance(legacy, profile, absolute(raw[legacy]), topics, profile.rules, True))
     declared = raw.get("agents") or {}
     for instance_id in sorted(declared):
         spec = declared[instance_id]
@@ -560,7 +614,7 @@ def agent_instances(raw: Mapping[str, Any]) -> list[AgentInstance]:
             instance_id,
             profile,
             absolute(spec["root"]),
-            _topics(spec.get("topics"), profile),
+            _chosen_topics(spec.get("topics"), preferences, instance_id, profile),
             rules,
             False,
         ))

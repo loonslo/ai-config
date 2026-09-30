@@ -66,10 +66,19 @@ def detect(
     configured: Mapping[str, Any] | None = None,
     home: Path | None = None,
     project_root: Path | None = None,
+    host: Any = None,
 ) -> dict[str, Any]:
-    """Inspect the machine and the tools; performs no writes."""
+    """Inspect the machine and the tools; performs no writes.
+
+    Codex and Claude are always listed (installed or not).  Every other agent
+    from the registry is listed only when its own configuration directory
+    exists, because only then can its rules entry be taken over.
+    """
+    from .agents import LEGACY_INSTANCES, PROFILES, HostEnv, detect_instances, display_name
+
     raw = dict(configured or {})
     home = home or Path.home()
+    host = host or HostEnv.for_home(home)
     python_ok = sys.version_info >= MINIMUM_PYTHON
     missing_modules = sorted(name for name in REQUIRED_MODULES if not _module_available(name))
     system = system_name()
@@ -89,6 +98,20 @@ def detect(
             "executable": executable,
             "installed": bool(executable) or exists,
             "configured": bool(configured_value),
+        })
+    others = [profile for profile in PROFILES.values() if profile.writable and profile.id not in LEGACY_INSTANCES]
+    for item in detect_instances(host, profiles=others):
+        if not item.exists:
+            continue
+        tools.append({
+            "tool": item.instance,
+            "name": display_name(item.instance),
+            "root": str(item.root),
+            "root_origin": item.origin,
+            "root_exists": True,
+            "executable": item.executable,
+            "installed": True,
+            "configured": bool((raw.get("agents") or {}).get(item.instance)),
         })
 
     dependencies = {
@@ -152,7 +175,7 @@ def guidance(report: Mapping[str, Any], *, project_root: Path | None = None) -> 
         messages.append({
             "level": "warning",
             "code": "NO_TOOL_DETECTED",
-            "message": "未检测到已安装的 Codex 或 Claude 配置目录。",
+            "message": "未检测到可接管的 AI agent 配置目录（Codex、Claude Code、CodeBuddy、WorkBuddy、TRAE）。",
             "action": "先安装并至少启动一次目标工具，使其生成配置目录，然后重新检测。未安装的工具不会自动创建配置。",
         })
     else:

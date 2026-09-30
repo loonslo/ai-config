@@ -76,7 +76,7 @@ class Sandbox:
     def detach(self, instance: str, *, restore_original: bool) -> dict:
         changes, report = migrate.plan_detach(self.raw, local=self.local, instance_id=instance, state_dir=self.state, restore_original=restore_original)
         transaction(changes, self.state / "backups", state_root=self.state)
-        migrate.remove_empty_dir(report.get("remove_empty_dir"))
+        migrate.remove_empty_dirs(report.get("remove_dirs"))
         return report
 
 

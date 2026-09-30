@@ -471,11 +471,17 @@ def plan_detach(raw: Mapping[str, Any], *, local: Path, instance_id: str, state_
             changes[entry.path] = result
             expected[entry.path] = digest(current)
             report["files"].append({"path": str(entry.path), "action": "delete" if result is None else "remove_block"})
-    report["remove_empty_dir"] = (
-        str(entry.path.parent)
-        if entry is not None and instance.rules is not None and instance.rules.mode == agents.MODE_FILE and "/" in instance.rules.path
-        else None
-    )
+    # Only directories ai-config itself created are removed afterwards (and only
+    # when empty); the record leaves with the detach so undo brings it back.
+    from .config_sync import CREATED_DIRS_FILE, created_dirs, created_dirs_bytes
+
+    recorded = created_dirs(state_dir)
+    report["remove_dirs"] = recorded.get(instance_id, [])
+    if instance_id in recorded:
+        path = state_dir / CREATED_DIRS_FILE
+        remaining = {key: value for key, value in recorded.items() if key != instance_id}
+        changes[path] = created_dirs_bytes(remaining)
+        expected[path] = digest(read_bytes(path))
 
     originals = _load_json(_originals_path(state_dir), {"schema_version": 1, "files": {}})
     files = originals.setdefault("files", {})
@@ -524,18 +530,18 @@ def plan_detach(raw: Mapping[str, Any], *, local: Path, instance_id: str, state_
     return PlannedChanges(changes, expected=expected, state_root=state_dir, metadata={"operation": "detach", "path_agents": path_agents}), report
 
 
-def remove_empty_dir(path: str | None) -> bool:
-    """Remove a directory ai-config created for an owned file, if now empty."""
-    if not path:
-        return False
-    directory = Path(path)
-    try:
-        if directory.is_dir() and not any(directory.iterdir()):
-            directory.rmdir()
-            return True
-    except OSError:
-        return False
-    return False
+def remove_empty_dirs(paths: Iterable[str] | None) -> list[str]:
+    """Remove directories ai-config created for an owned file, deepest first, if empty."""
+    removed: list[str] = []
+    for path in paths or ():
+        directory = Path(path)
+        try:
+            if directory.is_dir() and not directory.is_symlink() and not any(directory.iterdir()):
+                directory.rmdir()
+                removed.append(path)
+        except OSError:
+            continue
+    return removed
 
 
 # --------------------------------------------------------------------------

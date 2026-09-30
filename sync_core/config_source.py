@@ -13,7 +13,7 @@ be able to tell which of them actually happened:
     The shared value was written into this machine's tool target files by
     ``sync`` (``sync_core.config_sync``), with backup and read-back verification.
 
-Only ``common/``, ``codex/`` and ``claude/`` are ever committed from here.  A
+Only ``common/``, ``codex/``, ``claude/`` and ``agents.toml`` are ever committed from here.  A
 device's private state, its memory repository and the tool directories are never
 touched by this module, and a push is never forced: a diverged source keeps the
 local commit and asks the user to resolve it.
@@ -32,7 +32,12 @@ from .config import absolute
 from .utils import SECRET
 
 #: The only paths that may be committed and published from the source checkout.
-PUBLISHABLE_PATHS = ("common", "codex", "claude")
+#: ``agents.toml`` is a single file (shared topic choices per agent).
+PUBLISHABLE_PATHS = ("common", "codex", "claude", "agents.toml")
+
+
+def _publishable(name: str) -> bool:
+    return any(name == path or name.startswith(f"{path}/") for path in PUBLISHABLE_PATHS)
 
 _GIT_TIMEOUT = 60.0
 
@@ -253,7 +258,7 @@ def publish(config: Mapping[str, Any] | Any, *, apply: bool, message: str | None
     staged = _staged_paths(root)
     if not staged:
         return {"status": "nothing_to_publish", "root": str(root), "files": [], "commit": head(root), "detail": "没有需要发布的暂存内容。"}
-    outside = [name for name in staged if not name.startswith(tuple(f"{path}/" for path in PUBLISHABLE_PATHS))]
+    outside = [name for name in staged if not _publishable(name)]
     if outside:
         raise ConfigSourceError("暂存区包含配置源之外的文件，已停止发布：" + "、".join(outside), exit_code=4)
     _scan_staged(root, staged)

@@ -22,12 +22,13 @@ from .transaction import PlannedChanges, SyncLock, transaction
 
 
 class ConfigSyncError(RuntimeError):
-    """A stage-scoped failure with a stable stage name."""
+    """A stage-scoped failure with a stable stage name (and optional message code)."""
 
-    def __init__(self, stage: str, message: str, *, exit_code: int = 1) -> None:
+    def __init__(self, stage: str, message: str, *, exit_code: int = 1, code: str | None = None) -> None:
         super().__init__(message)
         self.stage = stage
         self.exit_code = exit_code
+        self.code = code
 
 
 STAGES = ("drift", "fetch", "publish", "resolve", "apply", "verify", "receipt")
@@ -47,6 +48,10 @@ def local_drift(config: DeviceConfig, *, expected: Mapping[str, Any] | None = No
     targets = config_status.scope_targets(raw)
     projections = expected or _expected_projections(config)
     records: list[dict[str, Any]] = []
+    from .agents import RULES_KINDS
+    from .load_check import extract_version, read_checks, state_of
+
+    checks = read_checks(config.state_dir)
     for target in targets:
         key = (target["tool"], target["target_kind"])
         record = config_status.inspect_target(
@@ -54,6 +59,12 @@ def local_drift(config: DeviceConfig, *, expected: Mapping[str, Any] | None = No
             expected_projection=projections.get(key),
             last_applied_digest=_last_applied_digest(config, target),
         )
+        if target["target_kind"] in RULES_KINDS:
+            # The version this device should announce, and whether an agent was
+            # shown to have loaded it (see ``verify-load``).
+            version = extract_version(projections.get(key))
+            record["rules_version"] = version
+            record["load_check"] = state_of(checks.get(target["tool"]), version)
         records.append(record)
     drifted = [record for record in records if record["status"] == "local_modified"]
     return {
@@ -63,7 +74,20 @@ def local_drift(config: DeviceConfig, *, expected: Mapping[str, Any] | None = No
         "drifting": drifted,
         "clean": not drifted,
         "summary": config_status.summarize(records),
+        "unresolved": unresolved_agents(raw),
     }
+
+
+def unresolved_agents(raw: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Registered agents that cannot receive rules yet, with the reason."""
+    from .agents import agent_instances, unresolved_reason
+
+    result = []
+    for instance in agent_instances(raw):
+        reason = unresolved_reason(instance)
+        if reason:
+            result.append({"instance": instance.id, "reason": reason})
+    return result
 
 
 #: A target only counts as verified when it matches the projection that was
@@ -205,6 +229,7 @@ def build_plan(config: DeviceConfig, *, apply: bool) -> tuple[PlannedChanges, di
                     "resolve",
                     "目标位置已有一个不是由 ai-config 创建的文件，无法接管；先运行 migrate 处理已有内容。",
                     exit_code=4,
+                    code="E3004",
                 ) from error
             if "edited locally" in str(error) or "Invalid managed block" in str(error):
                 raise ConfigSyncError(
@@ -224,9 +249,9 @@ def build_plan(config: DeviceConfig, *, apply: bool) -> tuple[PlannedChanges, di
             if key == "accepted_rules":
                 metadata.setdefault("accepted_rules", [])
                 metadata["accepted_rules"].extend(str(tool) for tool in value)
-            elif key == "path_agents":
-                metadata.setdefault("path_agents", {})
-                metadata["path_agents"].update(value)
+            elif key in {"path_agents", "created_dirs"}:
+                metadata.setdefault(key, {})
+                metadata[key].update(value)
     plan = PlannedChanges(changes, expected=expected, state_root=state, metadata=metadata)
     drift = local_drift(config)
     report = {
@@ -315,6 +340,7 @@ def sync(
             "drifting": resolved["drifting"],
             "remote": remote_state,
             "publish": publish_state,
+            "unresolved": unresolved_agents(config.raw),
             "note": "预览不代表已经应用；零变更预览也不代表已生效。",
         }
     if not plan:
@@ -333,6 +359,7 @@ def sync(
                 "verified": False,
                 "remote": remote_state,
                 "publish": publish_state,
+                "unresolved": unresolved_agents(config.raw),
                 "note": "没有需要写入的变化，但目标文件仍未与共享值一致；未记录成功。",
             }
         _record_applied(config, verified["targets"])
@@ -345,6 +372,7 @@ def sync(
             "verified": True,
             "remote": remote_state,
             "publish": publish_state,
+            "unresolved": unresolved_agents(config.raw),
             "receipt": report_state(),
             "note": "没有需要写入的变化；已重新核对目标文件。",
         }
@@ -381,6 +409,7 @@ def sync(
         )
     _record_applied(config, verified["targets"])
     _consume_restore_intent(config, plan)
+    record_created_dirs(config.state_dir, plan.metadata.get("created_dirs"))
 
     return {
         "status": "applied",
@@ -392,9 +421,47 @@ def sync(
         "drift": verified["summary"],
         "remote": remote_state,
         "publish": publish_state,
+        "unresolved": unresolved_agents(config.raw),
         "receipt": report_state(),
         "note": "本机目标文件已重新读取并核对一致；工具需要启动新会话才会加载。",
     }
+
+
+CREATED_DIRS_FILE = "created_dirs.json"
+
+
+def created_dirs(state_dir: Path) -> dict[str, list[str]]:
+    """Directories ai-config created for owned files, per agent instance."""
+    path = Path(state_dir) / CREATED_DIRS_FILE
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    dirs = data.get("dirs") if isinstance(data, dict) else None
+    return {str(key): [str(item) for item in value] for key, value in (dirs or {}).items() if isinstance(value, list)}
+
+
+def created_dirs_bytes(dirs: Mapping[str, list[str]]) -> bytes:
+    from .utils import json_bytes
+
+    return json_bytes({"schema_version": 1, "dirs": {key: value for key, value in sorted(dirs.items()) if value}})
+
+
+def record_created_dirs(state_dir: Path, created: Mapping[str, list[str]] | None) -> None:
+    """Remember newly created directories; an existing record is never shrunk here."""
+    from .utils import atomic_write
+
+    if not created:
+        return
+    dirs = created_dirs(state_dir)
+    for instance, paths in created.items():
+        known = dirs.setdefault(instance, [])
+        for path in paths:
+            if path not in known:
+                known.append(path)
+    atomic_write(Path(state_dir) / CREATED_DIRS_FILE, created_dirs_bytes(dirs))
 
 
 def _consume_restore_intent(config: DeviceConfig, plan: PlannedChanges) -> None:
