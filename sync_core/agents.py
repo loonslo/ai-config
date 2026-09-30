@@ -330,6 +330,7 @@ PROFILES: dict[str, AgentProfile] = {
         level=LEVEL_DETECT,
         kind="manager",
         locations=(_home(".cc-switch", "cc-switch"),),
+        skills=("skills",),
         manages=(
             "Claude/Codex 的提供商与 API 设置（例如 settings.json 中的 env）",
             "skills 目录（可能以链接方式接管 ~/.claude/skills）",

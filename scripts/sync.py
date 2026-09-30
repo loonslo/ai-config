@@ -1049,6 +1049,25 @@ def _status_label(status: str) -> str:
     return _STATUS_LABELS.get(status, f"未知（{status}）")
 
 
+def _scan_command(args: argparse.Namespace, local: Path) -> None:
+    """Read-only inventory of every agent; works before any device.json exists."""
+    from sync_core import agents, scan as scanner
+
+    raw = load_config(local).raw if local.exists() else None
+    host = agents.HostEnv.current()
+    report = scanner.scan(host, store_root=_source_root(raw), config=raw)
+    saved: Path | None = None
+    if args.apply:
+        state = config_absolute(raw["state_dir"]) if raw else Path.home() / ".ai-sync" / "state"
+        saved = scanner.persist(report, state)
+    if args.json:
+        print(json.dumps({**report, "saved": str(saved) if saved else None}, ensure_ascii=False))
+        return
+    print(scanner.render(report))
+    if saved:
+        print(f"报告已保存：{saved}")
+
+
 def _setup_command(args: argparse.Namespace, local: Path) -> None:
     from sync_core import messages
     from sync_core.environment import detect as detect_environment
@@ -1443,7 +1462,7 @@ def main() -> None:
         "mode",
         choices=[
             "quick", "rules", "config", "memory", "doctor", "inventory", "finish", "start", "restore",
-            "setup", "sync", "status", "diff", "undo", "memory-setup", "project",
+            "setup", "sync", "status", "diff", "undo", "memory-setup", "project", "scan",
         ],
     )
     parser.add_argument("--local", type=Path, default=Path("device.json"))
@@ -1466,6 +1485,9 @@ def main() -> None:
     parser.add_argument("--choice", choices=["share", "local", "restore"], help="Non-interactive diff outcome")
     parser.add_argument("--disable", action="store_true", help="Disable a capability while keeping local data")
     args = parser.parse_args()
+    if args.mode == "scan":
+        _scan_command(args, args.local)
+        return
     generated_config = args.mode in {"quick", "setup"} and not args.local.exists()
     if generated_config and args.mode == "setup":
         config = _generated_device_config(args.local)
