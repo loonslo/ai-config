@@ -1,0 +1,6 @@
+# 各 agent 从 common/ 接收哪些规则主题（可选）。
+# 未列出的 agent 使用内置默认值：编程类 agent 接收全部主题，WorkBuddy 只接收 instructions、principles、security。
+# 可以按 agent 类型（如 workbuddy）或实例（如 workbuddy-ai）设置，实例优先。
+#
+# [workbuddy]
+# topics = ["instructions", "principles", "security"]

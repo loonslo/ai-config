@@ -67,6 +67,7 @@ def detect(
     home: Path | None = None,
     project_root: Path | None = None,
     host: Any = None,
+    require_git: bool = True,
 ) -> dict[str, Any]:
     """Inspect the machine and the tools; performs no writes.
 
@@ -127,6 +128,7 @@ def detect(
         "git": {
             "ok": shutil.which("git") is not None,
             "executable": shutil.which("git"),
+            "required": require_git,
         },
     }
 
@@ -136,7 +138,7 @@ def detect(
         "read_only": True,
         "dependencies": dependencies,
         "tools": tools,
-        "ready": python_ok and not missing_modules and bool(dependencies["git"]["ok"]),
+        "ready": python_ok and not missing_modules and (bool(dependencies["git"]["ok"]) or not require_git),
     }
     report["guidance"] = guidance(report, project_root=project_root)
     return report
@@ -168,7 +170,13 @@ def guidance(report: Mapping[str, Any], *, project_root: Path | None = None) -> 
             action = "安装 Git for Windows（https://git-scm.com/download/win），安装后重开终端再运行 ai-project 启动脚本。"
         else:
             action = "安装 Git（例如在 macOS 执行 brew install git），然后重新运行 ai-config.command。"
-        messages.append({"level": "error", "code": "GIT_MISSING", "message": "未找到 git 命令，无法同步共享配置。", "action": action})
+        required = bool(git.get("required", True))
+        messages.append({
+            "level": "error" if required else "info",
+            "code": "GIT_MISSING" if required else "GIT_OPTIONAL",
+            "message": "未找到 git 命令，远端 Git 配置源暂不可用。" if required else "未找到 git 命令；本机配置和离线迁移仍可使用。",
+            "action": action if required else "如需克隆或发布 Git 配置源，再配置 Git；仅本机和离线功能不需要 Git。",
+        })
 
     installed = [tool for tool in report.get("tools", []) if tool.get("installed")]
     if not installed:

@@ -152,9 +152,14 @@ def mark_head_confirmed(root: Path, device: str, scope: str) -> Path:
 
 def snapshot_confirmed(root: Path, manifest: Mapping[str, Any]) -> bool:
     receipt = root / "confirmations" / manifest["device_id"] / f"{manifest['snapshot_id']}.json"
-    if not receipt.exists():
+    if any(path.is_symlink() for path in (root / "confirmations", receipt.parent, receipt)):
         return False
-    data = json.loads(receipt.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return False
+    if not isinstance(data, Mapping):
+        return False
     return all(data.get(key) == manifest.get(key) for key in ("device_id", "snapshot_id", "manifest_sha256")) and data.get("status") == "uploaded"
 
 

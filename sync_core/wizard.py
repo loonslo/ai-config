@@ -178,6 +178,8 @@ def describe_plan(config: Mapping[str, Any]) -> list[str]:
         f"共享配置源：{config.get('remote_identity') or '（未设置，本机先作为第一台设备）'}",
         f"共享记忆仓库：{config['memory_repo']}",
     ]
+    if config.get("config_repo"):
+        lines.append(f"配置库（各 agent 的规则来源）：{config['config_repo']}")
     from .agents import display_name
 
     for tool in ("codex", "claude"):

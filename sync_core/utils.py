@@ -13,8 +13,13 @@ from typing import Any
 
 SECRET = re.compile(
     r"sk-[A-Za-z0-9_-]{20,}|"
+    r"(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})|"
+    r"AKIA[A-Z0-9]{16}|"
     r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|"
-    r"(?i:api[_-]?key|access[_-]?token|secret)\s*[:=]\s*[\"'][^\"']{12,}[\"']|"
+    r"(?i:Authorization)\s*:\s*(?i:Bearer)\s+[A-Za-z0-9._~+/-]{12,}|"
+    r"eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}|"
+    r"(?i:api[_ -]?key|access[_ -]?token|password|passwd|secret|密码|口令|密钥|令牌)"
+    r"\s*[:=：]\s*(?:[\"'][^\"']{8,}[\"']|[A-Za-z0-9_~+/-]{8,})|"
     r"(?im:^[A-Z0-9_]*(?:PASSWORD|PASSWD|TOKEN|API_KEY)\s*=\s*\S+)"
 )
 

@@ -162,14 +162,14 @@ def _expected_projections(config: DeviceConfig) -> dict[tuple[str, str], Any]:
     local overrides.  Anything else would make a successful apply fail its own
     read-back check.
     """
-    from scripts.sync import _rules_body, _source_root
+    from .planning import rules_body, source_root
     from .agents import managed_targets
 
-    template_root = Path(_source_root(config.raw))
+    template_root = Path(source_root(config.raw, default_root=ROOT_FOR_TEMPLATES))
     projections: dict[tuple[str, str], Any] = {}
     for instance, entry in managed_targets(config.raw):
         # Each instance renders its own topic selection, exactly as the writer does.
-        body = _rules_body(config.raw, instance)
+        body = rules_body(config.raw, instance, default_root=ROOT_FOR_TEMPLATES)
         block, error = config_status.managed_block(body)
         projections[(instance.id, entry.kind)] = block if error is None else body
 
@@ -214,13 +214,16 @@ def build_plan(config: DeviceConfig, *, apply: bool) -> tuple[PlannedChanges, di
     A managed block that was edited locally into different content is reported
     as a conflict: the shared value is never silently written over it.
     """
-    from scripts.sync import _config_plan, _rules_plan
+    from .planning import config_plan, rules_plan
 
     state = config.state_dir
     metadata: dict[str, Any] = {"operation": "config"}
     changes: dict[Any, Any] = {}
     expected: dict[Any, Any] = {}
-    for producer in (_rules_plan, _config_plan):
+    for producer in (
+        lambda raw, target_state: rules_plan(raw, target_state, default_root=ROOT_FOR_TEMPLATES),
+        lambda raw, target_state: config_plan(raw, target_state, default_root=ROOT_FOR_TEMPLATES),
+    ):
         try:
             produced = producer(config.raw, state)
         except ValueError as error:
@@ -682,7 +685,9 @@ def plan_ownership(
             result["status"] = "preview"
             result["written"] = False
             return result
-        _write_template_value(_share_template_root(config), tool, field_name, value)
+        result["backup"] = _write_template_value(
+            _share_template_root(config), tool, field_name, value, state_dir=config.state_dir
+        )
         result.update({"status": "saved", "written": True})
         return result
 
@@ -703,7 +708,7 @@ def plan_ownership(
             result["written"] = False
             return result
         entry[field_name] = value
-        _write_local_overrides(config, overrides)
+        result["backup"] = _write_local_overrides(config, overrides)
         result.update({"status": "saved", "written": True})
         return result
 
@@ -722,12 +727,15 @@ def plan_ownership(
     }
 
 
-def _write_template_value(root: Path, tool: str, field_name: str, value: Any) -> None:
-    """Update one managed key in a shared template, preserving everything else."""
-    from .utils import atomic_write
+def _write_template_value(root: Path, tool: str, field_name: str, value: Any, *, state_dir: Path) -> str | None:
+    """Update one managed key in a shared template with a recoverable backup."""
+    from .utils import digest
 
     path = Path(root) / SHARE_TEMPLATES[tool]
-    text = path.read_text(encoding="utf-8")
+    if path.is_symlink():
+        raise OwnershipError("共享规则模板是符号链接；未写入内容。", exit_code=4)
+    current = path.read_bytes()
+    text = current.decode("utf-8")
     if tool == "codex":
         try:
             import tomlkit
@@ -735,17 +743,34 @@ def _write_template_value(root: Path, tool: str, field_name: str, value: Any) ->
             raise OwnershipError("缺少 tomlkit，无法更新共享模板。") from error
         document = tomlkit.parse(text)
         document[field_name] = value
-        atomic_write(path, tomlkit.dumps(document).encode("utf-8"))
-        return
-    document = json.loads(text)
-    document[field_name] = value
-    atomic_write(path, (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+        updated = tomlkit.dumps(document).encode("utf-8")
+    else:
+        document = json.loads(text)
+        document[field_name] = value
+        updated = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    plan = PlannedChanges(
+        {path: updated},
+        expected={path: digest(current)},
+        state_root=state_dir,
+        metadata={"operation": "diff-share", "path_agents": {}},
+    )
+    backup = transaction(plan, state_dir / "backups", state_root=state_dir)
+    return str(backup) if backup else None
 
 
-def _write_local_overrides(config: DeviceConfig, overrides: Mapping[str, Any]) -> None:
-    from .utils import atomic_write, json_bytes
+def _write_local_overrides(config: DeviceConfig, overrides: Mapping[str, Any]) -> str | None:
+    from .utils import digest, json_bytes, read_bytes
 
-    atomic_write(_local_override_path(config), json_bytes(dict(overrides)))
+    path = _local_override_path(config)
+    current = read_bytes(path)
+    plan = PlannedChanges(
+        {path: json_bytes(dict(overrides))},
+        expected={path: digest(current)},
+        state_root=config.state_dir,
+        metadata={"operation": "diff-local", "path_agents": {}},
+    )
+    backup = transaction(plan, config.state_dir / "backups", state_root=config.state_dir)
+    return str(backup) if backup else None
 
 
 def plan_rules_ownership(

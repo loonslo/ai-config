@@ -32,7 +32,12 @@ Thumbs.db
 .idea/
 .vscode/
 device.json
+*.bak-ai-config
 __pycache__/
 .pytest_cache/
 .venv/
+.server-venv/
+deploy/.env
+deploy/backups/
+release-artifacts/
 .workbuddy-ai/
