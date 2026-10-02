@@ -51,10 +51,12 @@ CATALOG: tuple[CatalogItem, ...] = (
     CatalogItem("codex", "main", "settings_fields", 1, "fields", "config.toml", "auto"),
     CatalogItem("codex", "main", "skills_text", 1, "file", "skills/**", "auto"),
     CatalogItem("codex", "main", "trust_fields", 1, "fields", "projects", "confirm"),
-    *(CatalogItem(agent, agent, "persona", 1, "file", name, "auto", "draft")
+    *(CatalogItem(agent, agent, "persona", 1, "file", name, "manual")
       for agent in ("workbuddy", "workbuddy-ai")
-      for name in ("BOOTSTRAP.md", "IDENTITY.md", "SOUL.md", "USER.md", "MEMORY.md")),
-    *(CatalogItem(agent, agent, kind, 1, "file", pattern, "auto", "draft", scope)
+      for name in ("BOOTSTRAP.md", "IDENTITY.md", "SOUL.md", "USER.md")),
+    *(CatalogItem(agent, agent, "memory", 1, "file", "MEMORY.md", "manual")
+      for agent in ("workbuddy", "workbuddy-ai")),
+    *(CatalogItem(agent, agent, kind, 1, "file", pattern, "manual", "approved", scope)
       for agent in ("workbuddy", "workbuddy-ai")
       for kind, pattern, scope in (("memory", "memory/**", "agent"), ("skills_text", "skills/**", "agent"),
                                    ("memory", f".{agent}/memory/**", "project"), ("skills_text", f".{agent}/skills/**", "project"))),
