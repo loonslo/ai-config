@@ -1,0 +1,9 @@
+{
+  "core_projects": [],
+  "exclude_patterns": [".claude/worktrees/**", "**/scratch-workspaces/**", ".chatgpt-projects/**"],
+  "root_map": [],
+  "instances": {},
+  "include_desktop_fields": [],
+  "allow_secret_hit_paths": [],
+  "running_process_names": ["Claude.exe", "Codex.exe", "WorkBuddy.exe", "WorkBuddy AI.exe", "claude", "codex", "workbuddy"]
+}
