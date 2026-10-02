@@ -167,7 +167,8 @@ class BundleWriter:
 
     def add_file(self, archive_path: str, data: bytes, *, agent: str, instance: str, kind: str,
                  logical_path: str, tier: int = 1, mode: str = "file", restore: str = "auto",
-                 project_id: str | None = None, flags: list[str] | None = None) -> None:
+                 project_id: str | None = None, flags: list[str] | None = None,
+                 fields: list[str] | None = None, confirm_fields: list[str] | None = None) -> None:
         _member_name(archive_path)
         if not archive_path.startswith("files/") or not isinstance(data, bytes) or len(data) > MAX_FILE_BYTES or archive_path in self._files:
             raise BundleError("invalid file for bundle")
@@ -178,6 +179,9 @@ class BundleWriter:
             "sha256": hashlib.sha256(data).hexdigest(), "size": len(data), "restore": restore,
             "project_id": project_id, "flags": flags or [],
         })
+        if mode == "fields":
+            self.entries[-1]["fields"] = fields or []
+            self.entries[-1]["confirm_fields"] = confirm_fields or []
 
     def add_report(self, name: str, content: str | bytes) -> None:
         archive_path = "reports/" + name

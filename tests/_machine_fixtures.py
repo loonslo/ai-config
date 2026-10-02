@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import sqlite3
+import subprocess
 import zipfile
 
 from _agent_homes import SENTINEL, build_home
@@ -12,10 +13,11 @@ from sync_core.machine.paths import derive_project_dir
 
 
 def build_machine_home(home: Path) -> dict[str, Path]:
-    build_home(home, agents=("claude", "codex", "workbuddy", "workbuddy-ai"))
+    decoys = build_home(home, agents=("claude", "codex", "workbuddy", "workbuddy-ai"))
     workspace = home / "workspace"
     project = workspace / "sample-project"
     project.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
     native = str(project)
     (home / ".claude.json").write_text(json.dumps({
         "projects": {native: {"hasTrustDialogAccepted": True}, native.replace("\\", "/"): {"hasTrustDialogAccepted": True}},
@@ -46,7 +48,7 @@ def build_machine_home(home: Path) -> dict[str, Path]:
         (root / "note.md").write_text("# project memory\n", encoding="utf-8")
         (project / f".{agent}" / "skills").mkdir()
         (project / f".{agent}" / "skills" / ".old_migration.json").write_text(SENTINEL, encoding="utf-8")
-    return {"home": home, "workspace": workspace, "project": project}
+    return {"home": home, "workspace": workspace, "project": project, "protected": decoys["protected"]}
 
 
 def assert_no_sentinel(zip_path: Path) -> None:
