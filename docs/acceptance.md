@@ -496,3 +496,9 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 
 - 核心项目记忆默认加入恢复计划；先映射存在的核心文件夹与 Git 根，再按目标原生路径推导目录；Windows 复用已有大小写变体。索引不合并，冲突保留现有并写 .from-bundle、提示手动整理；写前再次检查核心项目仍存在。
 - `tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_memory_restore.py tests/test_machine_apply.py -q --basetemp tmp/run-mk33-20261002-a`：**4 passed**。覆盖大小写变体不重复建目录、MEMORY.md 冲突保留、原样字节恢复及 Windows→Mac 目标路径样例（运行环境仍是 Windows，不代表真实 Mac）。
+
+### MK-34 WorkBuddy 手动候选恢复（2026-10-02）
+
+- 按已批准 manual 分档，默认跳过 WorkBuddy；专家显式 --workbuddy-files 才将批准的人设／记忆／技能安全文本按原相对路径写回两个独立实例及映射后的项目。仍用 MK-31 的进程门禁／事务；没有 settings 字段、AGENTS.md、应用标记或账户文件写入。结果明确要求打开 WorkBuddy 核对加载，文本落盘不代表自动加载。
+- `tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_workbuddy_restore.py -q --basetemp tmp/run-mk34-20261002-b`：**1 passed，3.31 秒**。验证默认不写、显式恢复原样字节及项目相对目录；keyblob／security／app／数据库／settings 诱饵零读取、字节不变；未新建 AGENTS.md 或迁移标记。初次用例错误调用 ReadTracker 不存在的 close，删去后通过（零读取断言在测试主动核对诱饵字节之前执行）。
+- 真实 WorkBuddy 加载／人工识别仍未验收，MK-34 保持部分完成。

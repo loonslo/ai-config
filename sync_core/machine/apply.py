@@ -90,6 +90,8 @@ def plan_restore(check: Preflight, *, state: Path, process_names: tuple[str,...]
         if entry['agent'].startswith('workbuddy') and not workbuddy_files:
             skipped.append({**record,'reason':'manual_workbuddy'})
             continue
+        if entry['agent'].startswith('workbuddy') and '打开 WorkBuddy，确认人设与记忆可见；文本写回不代表自动加载成功。' not in warnings:
+            warnings.append('打开 WorkBuddy，确认人设与记忆可见；文本写回不代表自动加载成功。')
         if entry['kind']=='memory' and entry['agent']=='claude' and not include_memory:
             skipped.append({**record,'reason':'memory_not_selected'})
             continue

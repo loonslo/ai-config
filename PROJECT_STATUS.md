@@ -36,6 +36,7 @@ evidence:
   - tests/test_machine_apply.py
   - tests/test_machine_trust.py
   - tests/test_machine_memory_restore.py
+  - tests/test_machine_workbuddy_restore.py
   - sync_core/machine/procs.py
   - tests/test_machine_preflight.py
   - tests/test_machine_guided_backup.py
@@ -133,3 +134,5 @@ evidence:
 2026-10-02 MK-32：Codex 信任还原哈希门禁与注释／未知字段保留、冲突及幂等沙箱测试通过；真实信任仍需 G5，未执行。
 
 2026-10-02 MK-33：记忆目标目录推导、大小写复用、索引冲突与原样字节的隔离测试通过；真实记忆加载尚未验收。
+
+2026-10-02 MK-34：明确选择后的 WorkBuddy 候选文本落盘沙箱通过，受保护诱饵零读取／不变；真实加载继续未验证。
