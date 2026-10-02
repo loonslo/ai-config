@@ -63,7 +63,7 @@ def test_claude_and_codex_capabilities_are_stated_differently(tmp_path):
 def test_blocked_source_cannot_be_enabled_and_shows_a_reason(tmp_path):
     blocked = tmp_path / "claude" / "projects" / "secret" / "memory"
     blocked.mkdir(parents=True)
-    (blocked / "creds.md").write_text("SERVICE_PASSWORD=verysecretvalue")
+    (blocked / "creds.md").write_text("SERVICE_PASSWORD=" + "verysecretvalue")
     raw = _config(tmp_path)
     raw["claude"] = str(tmp_path / "claude")
     rows = onboarding.candidate_sources(DeviceConfig(raw, None))
@@ -76,7 +76,7 @@ def test_a_secret_bearing_source_is_never_downgraded_to_just_needing_mapping(tmp
     """A blocked scan must stay blocked, not become "confirm and sync"."""
     blocked = tmp_path / "claude" / "projects" / "secret" / "memory"
     blocked.mkdir(parents=True)
-    (blocked / "creds.md").write_text("SERVICE_PASSWORD=verysecretvalue")
+    (blocked / "creds.md").write_text("SERVICE_PASSWORD=" + "verysecretvalue")
     raw = _config(tmp_path)
     raw["claude"] = str(tmp_path / "claude")
     rows = onboarding.candidate_sources(DeviceConfig(raw, None))

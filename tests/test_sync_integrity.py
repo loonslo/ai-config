@@ -501,7 +501,7 @@ def test_sharing_a_rules_block_stages_it_without_claiming_the_share(tmp_path, mo
 
 
 def test_merging_the_shared_block_closes_the_share_loop(tmp_path, monkeypatch):
-    from scripts import sync as sync_script
+    from sync_core import planning
 
     device, _agents = _hand_edited_device(tmp_path, monkeypatch)
     drift = config_sync.local_drift(device)
@@ -514,7 +514,7 @@ def test_merging_the_shared_block_closes_the_share_loop(tmp_path, monkeypatch):
     # A human merges the staged block into common/; the tool cannot split an
     # aggregated block back into topic files, so the fixture simulates the merge
     # by making the source produce exactly the merged block.
-    monkeypatch.setattr(sync_script, "_body", lambda config=None: staged)
+    monkeypatch.setattr(planning, "render_body", lambda config=None, topics=None, *, default_root=None: staged)
     report = config_sync.sync(device, apply=True)
     assert report["status"] == "applied" and report["verified"] is True, report
     # The loop is closed: a further sync is a no-op, not another conflict.

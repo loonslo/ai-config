@@ -108,9 +108,59 @@ def test_declare_previews_then_registers_and_can_be_undone(tmp_path):
     again = _cli(local, "declare", "--agent", "kiro", "--root", str(root), "--entry", "steering/ai-config.md", "--apply")
     assert again.returncode == 4
 
+
+def test_application_service_declares_without_cli_output(tmp_path, capsys):
+    from sync_core.application import ApplicationService
+
+    store = write_store(tmp_path / "store")
+    local = tmp_path / "device.json"
+    local.write_bytes(json_bytes(device_raw(tmp_path, store)))
+    before = local.read_bytes()
+    root = tmp_path / "custom-agent"
+    service = ApplicationService(local)
+
+    preview = service.declare(agent_id="kiro", root=str(root), entry="steering/rules.md")
+    assert preview.data == {
+        "status": "preview",
+        "agent": "kiro",
+        "declaration": {
+            "root": str(root),
+            "profile": agents.GENERIC,
+            "rules": {"mode": agents.MODE_FILE, "path": "steering/rules.md"},
+        },
+        "root_exists": False,
+        "written": False,
+    }
+    assert local.read_bytes() == before
+
+    applied = service.declare(agent_id="kiro", root=str(root), entry="steering/rules.md", apply=True)
+    assert applied.data["status"] == "declared"
+    assert load_config(local).raw["agents"]["kiro"] == preview.data["declaration"]
+    assert capsys.readouterr() == ("", "")
+
     undo = _cli(local, "undo", "--index", "1", "--apply")
     assert undo.returncode == 0, undo.stderr
+
+
+def test_memory_disable_is_preview_only_until_explicit_apply(tmp_path):
+    from sync_core.application import ApplicationService
+
+    store = write_store(tmp_path / "store")
+    raw = device_raw(tmp_path, store)
+    raw["memories"] = [{"id": "project", "path": str(tmp_path / "memory")}]
+    local = tmp_path / "device.json"
+    local.write_bytes(json_bytes(raw))
+    before = local.read_bytes()
+    service = ApplicationService(local)
+
+    preview = service.memory_setup(disable=True)
+    assert preview.data["status"] == "preview"
+    assert preview.data["written"] is False
     assert local.read_bytes() == before
+
+    applied = service.memory_setup(disable=True, apply=True)
+    assert applied.data["written"] is True
+    assert load_config(local).raw["memories"] == []
 
 
 @pytest.mark.parametrize("entry", ["../outside.md", "notes.txt", "secrets/x.md"])

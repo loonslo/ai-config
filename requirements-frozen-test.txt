@@ -1,0 +1,6 @@
+-r requirements-test.txt
+fastapi==0.142.2
+httpx==0.28.1
+sqlalchemy==2.1.1
+pyjwt==2.15.1
+cryptography==50.0.2

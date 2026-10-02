@@ -311,6 +311,16 @@ def test_missing_git_guidance_is_platform_specific(tmp_path, monkeypatch):
     assert environment.missing_dependency_exit(report) == 2
 
 
+def test_missing_git_does_not_block_local_offline_setup(tmp_path, monkeypatch):
+    monkeypatch.setattr(environment.shutil, "which", lambda name: None if name == "git" else "/usr/bin/" + name)
+    report = environment.detect(configured={}, home=tmp_path, require_git=False)
+    guidance = {item["code"]: item for item in report["guidance"]}
+    assert report["ready"] is True
+    assert report["dependencies"]["git"]["required"] is False
+    assert guidance["GIT_OPTIONAL"]["level"] == "info"
+    assert environment.missing_dependency_exit(report) == 0
+
+
 # --------------------------------------------------------------------------
 # TASK-14 (catalogue): stable codes and no raw tracebacks
 # --------------------------------------------------------------------------

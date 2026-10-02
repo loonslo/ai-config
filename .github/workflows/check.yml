@@ -1,7 +1,37 @@
 name: Cross-platform checks
 on: [push, pull_request]
+
 jobs:
-  test:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      frozen: ${{ steps.filter.outputs.frozen }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frozen:
+              - '.github/workflows/check.yml'
+              - 'requirements-frozen-test.txt'
+              - 'desktop/**'
+              - 'server/**'
+              - 'deploy/**'
+              - 'sync_core/application/**'
+              - 'sync_core/cloud/**'
+              - 'sync_core/package/**'
+              - 'tests/test_application_protocol.py'
+              - 'tests/test_cloud_core.py'
+              - 'tests/test_desktop_extensions.py'
+              - 'tests/test_package_*.py'
+
+  core:
     strategy:
       matrix:
         os: [windows-latest, macos-latest]
@@ -11,6 +41,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
-      - run: python -m pip install -r requirements.txt pytest
-      - run: python -m pytest -q
+      - run: python -m pip install -r requirements-test.txt
+      - run: python -m pytest -q --basetemp tmp/ci-core-${{ matrix.os }}
+      - run: python scripts/check-secrets.py
+
+  frozen:
+    needs: changes
+    if: needs.changes.outputs.frozen == 'true'
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m pip install -r requirements-frozen-test.txt
+      - run: python -m pytest -q --basetemp tmp/ci-frozen-${{ matrix.os }}
       - run: python scripts/check-secrets.py

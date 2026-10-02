@@ -36,6 +36,51 @@ def test_rules_preserve_existing_and_detect_edits(tmp_path):
         sync.plan(config, "rules")
 
 
+def test_cli_and_application_service_share_rules_plan(tmp_path, monkeypatch):
+    from sync_core.application import plan_local_changes
+    from sync_core.config import SHARED_RULE_TOPICS
+
+    source = tmp_path / "source"
+    common = source / "common"
+    common.mkdir(parents=True)
+    for topic in SHARED_RULE_TOPICS:
+        (common / f"{topic}.md").write_text(f"# {topic}\n", encoding="utf-8")
+    monkeypatch.setattr(sync, "ROOT", source)
+    codex = tmp_path / "codex"
+    codex.mkdir()
+    config = {"state_dir": str(tmp_path / "state"), "codex": str(codex)}
+
+    cli_plan = sync.plan(config, "rules")
+    service_plan = plan_local_changes(config, "rules", template_root=source)
+    assert service_plan == cli_plan
+    assert service_plan.metadata == cli_plan.metadata
+    assert service_plan.expected == cli_plan.expected
+
+
+def test_application_service_memory_apply_creates_the_shared_snapshot_without_cli_config(tmp_path):
+    from sync_core.application import ApplicationService
+
+    local_source = tmp_path / "native-memory"
+    local_source.mkdir()
+    (local_source / "MEMORY.md").write_text("portable note", encoding="utf-8")
+    raw = {
+        "device": "windows-a",
+        "state_dir": str(tmp_path / "state"),
+        "memory_repo": str(tmp_path / "shared-memory"),
+        "memories": [{"id": "project", "path": str(local_source)}],
+    }
+    device = tmp_path / "device.json"
+    device.write_text(json.dumps(raw), encoding="utf-8")
+    service = ApplicationService(device, template_root=tmp_path / "application")
+
+    plan = service.plan(mode="memory")
+    result = service.apply_plan(plan)
+
+    assert result["status"] == "applied"
+    assert len(result["snapshots"]) == 1
+    assert (tmp_path / "shared-memory" / "heads" / "windows-a" / "project.json").is_file()
+
+
 def test_two_devices_and_deletion(tmp_path, monkeypatch):
     monkeypatch.setattr(sync, "ROOT", tmp_path / "config-repo")
     shared = tmp_path / "shared"
