@@ -357,7 +357,7 @@ python scripts/machine.py guide     restore [备份文件]
 | MK-30 | `machine preflight` | M | MK-26 | — | ✓（隔离比较与 Windows→Mac 映射通过；实机恢复待净室） |
 | MK-31 | `machine restore` ①档引擎 | L | MK-30 | G4 目标机写入 | ◐（核心事务／冲突／回滚沙箱通过；真实恢复待净室） |
 | MK-32 | Codex 信任还原 | S | MK-31 | **G5 信任清单确认** | ✓（哈希门禁、注释保留、冲突与幂等沙箱通过；真机待 G5） |
-| MK-33 | Claude 记忆映射还原 | M | MK-31 | — | ☐ |
+| MK-33 | Claude 记忆映射还原 | M | MK-31 | — | ✓（目标 Git 根重推导、大小写复用与索引冲突沙箱通过） |
 | MK-34 | WorkBuddy 还原 | M | MK-31,23 | G7 | ☐ |
 | MK-35 | `machine verify` | M | MK-31…34 | G6（可选项） | ☐ |
 | MK-36 | `machine undo` 与回滚演练 | S | MK-31 | — | ☐ |

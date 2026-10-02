@@ -199,6 +199,8 @@ def _destination(entry: dict[str, Any], *, roots: dict[str, Path], projects: dic
             candidates=[record for record in records.values() if record.get('git_root_id')==pieces[2]]
             if pieces[3]!='claude' or pieces[2]!=entry.get('project_id') or not pieces[4].startswith('memory/') or not candidates:
                 raise BundleError('memory outside core projects')
+            if not any(projects[record['project_id']] is not None for record in candidates):
+                return None,None,'project_missing'
             mapped=mapper.map(candidates[0]['git_root'])
             target_root=Path(mapped) if mapped else None
             if target_root is None or not target_root.is_dir():

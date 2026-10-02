@@ -49,7 +49,7 @@ class RestorePlan:
 def plan_restore(check: Preflight, *, state: Path, process_names: tuple[str,...],
                  overwrite: Iterable[Path] = (), prefer_bundle: Iterable[str] = (),
                  confirm_security: bool = False, security_hash: str | None = None,
-                 include_memory: bool = False, workbuddy_files: bool = False,
+                 include_memory: bool = True, workbuddy_files: bool = False,
                  codex_trust: bool = False, confirm_trust: str | None = None) -> RestorePlan:
     if security_hash is not None and (not confirm_security or security_hash!=check.security_list_hash):
         raise BundleError('security confirmation no longer matches displayed list')
@@ -93,6 +93,9 @@ def plan_restore(check: Preflight, *, state: Path, process_names: tuple[str,...]
         if entry['kind']=='memory' and entry['agent']=='claude' and not include_memory:
             skipped.append({**record,'reason':'memory_not_selected'})
             continue
+        if entry['kind']=='memory' and entry['agent']=='claude':
+            candidates=[record for record in check.manifest['projects'] if record['git_root_id']==entry['project_id']]
+            required_projects.update(check.projects[record['project_id']] for record in candidates if check.projects[record['project_id']] is not None)
         if entry['kind']=='trust_fields':
             if not codex_trust or item.fields['trust_level']!='trusted':
                 skipped.append({**record,'reason':'trust_not_confirmed'})
@@ -160,6 +163,8 @@ def plan_restore(check: Preflight, *, state: Path, process_names: tuple[str,...]
             destination=safe_destination(item.boundary,target.relative_to(item.boundary).as_posix()+'.from-bundle')
             alternate=target_bytes(destination)
             conflicts.append({**record,'saved_as':str(destination),'reason':'file_differs'})
+            if entry['kind']=='memory' and target.name=='MEMORY.md':
+                warnings.append('记忆索引已有不同内容；现有版本保留，请对照另存版本手动整理。')
             if alternate is not None and alternate!=item.data:
                 skipped.append({**record,'reason':'alternate_already_differs'})
                 continue

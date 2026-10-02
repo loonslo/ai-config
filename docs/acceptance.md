@@ -491,3 +491,8 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 
 - 只处理 bundle 核心项目存在者的 trusted 条目，默认不写。显式 codex-trust 要求 confirm-trust 与刚检查的清单哈希完全一致；应用前再次检查清单未变、项目仍存在。用 tomlkit 追加项目字段，保留注释／顺序与未知项；Windows 路径小写并识别大小写／分隔符已有变体。不同信任级别保留目标并报冲突，不接受 overwrite 绕过；与普通设置合并到同一个事务计划。
 - `tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_trust.py tests/test_machine_apply.py -q --basetemp tmp/run-mk32-20261002-a`：**4 passed，10.24 秒**。验证哈希不符拒绝、注释／未知项保留、仅预期项目、重复无操作、已有 untrusted 保留、展示后清单变化拒绝。找不到项目不进入信任清单，由 MK-30 用例覆盖。无真实目标写入或 G5 确认。
+
+### MK-33 Claude 记忆还原（2026-10-02）
+
+- 核心项目记忆默认加入恢复计划；先映射存在的核心文件夹与 Git 根，再按目标原生路径推导目录；Windows 复用已有大小写变体。索引不合并，冲突保留现有并写 .from-bundle、提示手动整理；写前再次检查核心项目仍存在。
+- `tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_memory_restore.py tests/test_machine_apply.py -q --basetemp tmp/run-mk33-20261002-a`：**4 passed**。覆盖大小写变体不重复建目录、MEMORY.md 冲突保留、原样字节恢复及 Windows→Mac 目标路径样例（运行环境仍是 Windows，不代表真实 Mac）。
