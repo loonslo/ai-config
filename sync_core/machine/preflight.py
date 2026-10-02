@@ -323,7 +323,9 @@ def preflight(bundle: Path, *, home: Path, config: MachineConfig, agents: frozen
             level=raw['trust_level']
             destination=norm(path,system).lower() if system in {'windows','nt','win32'} else norm(path,system)
             existing=tomllib.loads(current.decode('utf-8')) if current else {}
-            value=existing.get('projects',{}).get(destination,{}).get('trust_level')
+            tables=existing.get('projects',{})
+            found=next((table for key,table in tables.items() if norm(key,system).casefold()==destination.casefold()),{}) if system in {'windows','nt','win32'} else tables.get(destination,{})
+            value=found.get('trust_level') if isinstance(found,dict) else None
             status='new' if value is None else 'same' if value==level else 'differs'
             fields={'path':destination,'trust_level':level}
             if level=='trusted':

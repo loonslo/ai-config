@@ -13,6 +13,7 @@ from sync_core.utils import digest
 
 from .bundle import BundleError
 from .preflight import Preflight, get_field, no_links, safe_destination, target_bytes
+from .paths import norm
 from .procs import running_apps
 
 
@@ -38,6 +39,7 @@ class RestorePlan:
     restored: list[dict[str,Any]]
     warnings: list[str]
     process_names: tuple[str,...]
+    required_projects: tuple[Path,...]
 
     def report(self) -> dict[str,Any]:
         return {'mode':'preview','writes':len(self.changes),'conflicts':self.conflicts,'skipped':self.skipped,
@@ -56,16 +58,20 @@ def plan_restore(check: Preflight, *, state: Path, process_names: tuple[str,...]
     no_links(state)
     changes=PlannedChanges(state_root=state,metadata={'operation':'machine_restore','path_agents':{},
                                                       'content_id':check.manifest['content_id']})
-    boundaries={};conflicts=[];skipped=[];restored=[];warnings=[]
+    if codex_trust:
+        changes.metadata['trust_list_hash']=confirm_trust
+    if confirm_security:
+        changes.metadata['security_list_hash']=security_hash or check.security_list_hash
+    boundaries={};conflicts=[];skipped=[];restored=[];warnings=[];required_projects=set()
     overwrites={Path(path).absolute() for path in overwrite}
     preferred=set(prefer_bundle)
 
-    def add(path: Path, data: bytes, item, *, expected: bytes | None) -> None:
+    def add(path: Path, data: bytes, item, *, expected: bytes | None, merge: bool=False) -> None:
         boundary=item.boundary
         if boundary is None or not path.is_relative_to(boundary):
             raise BundleError('write escaped restoration boundary')
         no_links(path)
-        if path in changes and changes[path]!=data:
+        if path in changes and changes[path]!=data and not merge:
             raise BundleError('multiple entries propose different destination bytes')
         changes[path]=data
         changes.expected[path]=digest(expected)
@@ -91,11 +97,30 @@ def plan_restore(check: Preflight, *, state: Path, process_names: tuple[str,...]
             if not codex_trust or item.fields['trust_level']!='trusted':
                 skipped.append({**record,'reason':'trust_not_confirmed'})
                 continue
-            # MK-32 extends this guarded branch; never default to trust.
-            skipped.append({**record,'reason':'trust_engine_pending'})
+            project=check.projects[entry['project_id']]
+            if project is None or not project.is_dir():
+                raise BundleError('confirmed trust folder disappeared')
+            no_links(project)
+            required_projects.add(project)
+            if item.status=='differs':
+                conflicts.append({**record,'reason':'trust_differs','path':item.fields['path']})
+                continue
+            if item.status=='new':
+                prior=changes.get(target,item.current)
+                raw=tomlkit.parse(prior.decode('utf-8')) if prior else tomlkit.document()
+                if 'projects' not in raw:
+                    raw['projects']=tomlkit.table()
+                path=item.fields['path']
+                existing=next((key for key in raw['projects'] if norm(key,check.target_os).casefold()==path.casefold()),path) if check.target_os in {'windows','nt','win32'} else path
+                if existing not in raw['projects']:
+                    raw['projects'][existing]=tomlkit.table()
+                raw['projects'][existing]['trust_level']='trusted'
+                add(target,tomlkit.dumps(raw).encode('utf-8'),item,expected=item.current,merge=True)
+            restored.append({**record,'trust_path':item.fields['path'],'trust_level':'trusted'})
             continue
         if entry['kind']=='settings_fields':
-            raw=(json.loads(item.current) if entry['agent']=='claude' else tomlkit.parse(item.current.decode('utf-8'))) if item.current else ({} if entry['agent']=='claude' else tomlkit.document())
+            prior=changes.get(target,item.current)
+            raw=(json.loads(prior) if entry['agent']=='claude' else tomlkit.parse(prior.decode('utf-8'))) if prior else ({} if entry['agent']=='claude' else tomlkit.document())
             changed=False
             applied_fields={}
             for key,value in item.fields.items():
@@ -113,7 +138,7 @@ def plan_restore(check: Preflight, *, state: Path, process_names: tuple[str,...]
             if changed:
                 data=((json.dumps(raw,ensure_ascii=False,indent=2)+'\n').encode('utf-8') if entry['agent']=='claude'
                       else tomlkit.dumps(raw).encode('utf-8'))
-                add(target,data,item,expected=item.current)
+                add(target,data,item,expected=item.current,merge=True)
             if applied_fields:
                 restored.append({**record,'fields':applied_fields})
             continue
@@ -145,7 +170,7 @@ def plan_restore(check: Preflight, *, state: Path, process_names: tuple[str,...]
             current=alternate
         add(destination,item.data,item,expected=current)
         restored.append({**record,'target':str(destination),'sha256':entry['sha256']})
-    return RestorePlan(check,changes,boundaries,conflicts,skipped,restored,warnings,process_names)
+    return RestorePlan(check,changes,boundaries,conflicts,skipped,restored,warnings,process_names,tuple(required_projects))
 
 
 def apply_restore(plan: RestorePlan, *, processes: Iterable[str] | None = None,
@@ -153,6 +178,13 @@ def apply_restore(plan: RestorePlan, *, processes: Iterable[str] | None = None,
     running=running_apps(plan.process_names,processes=processes)
     if running:
         raise BundleError('target application is running')
+    for key,current in (('trust_list_hash',plan.check.trust_list_hash),('security_list_hash',plan.check.security_list_hash)):
+        if key in plan.changes.metadata and plan.changes.metadata[key]!=current:
+            raise BundleError('confirmed list changed')
+    for project in plan.required_projects:
+        no_links(project)
+        if not project.is_dir():
+            raise BundleError('required project disappeared')
     for path in plan.changes.expected:
         no_links(path)
         if digest(target_bytes(path))!=plan.changes.expected[path]:

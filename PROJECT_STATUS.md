@@ -34,6 +34,7 @@ evidence:
   - sync_core/machine/preflight.py
   - sync_core/machine/apply.py
   - tests/test_machine_apply.py
+  - tests/test_machine_trust.py
   - sync_core/machine/procs.py
   - tests/test_machine_preflight.py
   - tests/test_machine_guided_backup.py
@@ -127,3 +128,5 @@ evidence:
 2026-10-02 MK-30：只读目标解析和逐项／字段比较的 5 项测试通过，未运行真实目标恢复；P3 正在推进。
 
 2026-10-02 MK-31：核心事务写入、冲突与回滚隔离测试通过；记忆／信任／WorkBuddy、自动核验及撤销正在推进，真实目标写入未授权或执行。
+
+2026-10-02 MK-32：Codex 信任还原哈希门禁与注释／未知字段保留、冲突及幂等沙箱测试通过；真实信任仍需 G5，未执行。

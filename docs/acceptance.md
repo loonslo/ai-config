@@ -486,3 +486,8 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 - 预先构造 PlannedChanges，保留检查时目标 hash；白名单字段合并保留未知设置，默认保留不同字段，整文件冲突写 .from-bundle（该位置已存在且不同则跳过）。只有明确 overwrite／prefer-bundle 才替换，confirm 类未确认则跳过；安全清单可绑定哈希。所有写入通过现有 transaction 的锁、写前备份和 journal；写前及逐文件重新拒绝路径链接、运行中的应用、目标变化，写后重读核对。权限文件被 Git 跟踪只提醒。缺助手根或项目不创建。真实写入仍须 G4。
 - 初次全局 Python 3.14 缺 tomlkit，测试 collection 失败；改用既有核心隔离环境（Python 3.14、requirements-test 已安装），不安装全局依赖：`tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_apply.py tests/test_machine_preflight.py -q --basetemp tmp/run-mk31-20261002-b` → **5 passed，14.53 秒**。验证初次恢复、重复无操作、冲突保留＋另存、明确覆盖、进程拒绝、目标后续修改拒绝及中途失败回滚。只写夹具 HOME。
 - 记忆、信任与 WorkBuddy 扩展在 MK-32…34 实现；WorkBuddy manual 文本默认不写，新增显式 --workbuddy-files 仅复制批准候选并保留人工加载核验，避免把 G7 的 manual 分档变成默认自动恢复。专家 restore 默认只打印计划。
+
+### MK-32 Codex 信任还原（2026-10-02）
+
+- 只处理 bundle 核心项目存在者的 trusted 条目，默认不写。显式 codex-trust 要求 confirm-trust 与刚检查的清单哈希完全一致；应用前再次检查清单未变、项目仍存在。用 tomlkit 追加项目字段，保留注释／顺序与未知项；Windows 路径小写并识别大小写／分隔符已有变体。不同信任级别保留目标并报冲突，不接受 overwrite 绕过；与普通设置合并到同一个事务计划。
+- `tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_trust.py tests/test_machine_apply.py -q --basetemp tmp/run-mk32-20261002-a`：**4 passed，10.24 秒**。验证哈希不符拒绝、注释／未知项保留、仅预期项目、重复无操作、已有 untrusted 保留、展示后清单变化拒绝。找不到项目不进入信任清单，由 MK-30 用例覆盖。无真实目标写入或 G5 确认。
