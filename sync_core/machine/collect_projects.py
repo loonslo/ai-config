@@ -237,7 +237,7 @@ def collect_projects(writer: BundleWriter, *, home: Path, config: MachineConfig,
                     result.warnings.append({"code": "E7202", "message": "一个项目本地权限文件无法安全读取"})
                     continue
                 if SECRET.search(data.decode("utf-8", errors="replace")):
-                    result.exclusions.append({"logical_path": f"project:{pid}/{relative}", "reason": "secret_hit"})
+                    result.exclusions.append({"logical_path": f"project:{pid}/{relative}", "source_path": str(source), "reason": "secret_hit"})
                     result.warnings.append({"code": "E7203", "message": "一个项目本地权限文件命中凭据特征，已跳过"})
                     continue
                 permissions = parsed.get("permissions", {}) if isinstance(parsed, dict) else {}

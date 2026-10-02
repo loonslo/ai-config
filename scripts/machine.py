@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sync_core.machine.paths import derive_project_dir
 from sync_core.machine.backup import AGENTS, apply_backup, prepare_backup
 from sync_core.machine.config import load_config
+from sync_core.machine.guide_backup import guide_backup
 from sync_core.messages import Message
 
 
@@ -60,7 +61,11 @@ def main(argv: list[str] | None = None) -> int:
     backup.add_argument("--agents", help="comma-separated agent names")
     backup.add_argument("--apply", action="store_true")
     backup.add_argument("--json", action="store_true")
+    guide = sub.add_parser("guide", help="beginner interactive guide")
+    guide.add_argument("operation", choices=("backup",))
     args = parser.parse_args(argv)
+    if args.command == "guide":
+        return guide_backup()
     if args.command == "paths":
         try:
             report = check_claude_project_dirs(home=Path.home())

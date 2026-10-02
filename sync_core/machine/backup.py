@@ -21,6 +21,7 @@ from .collect_reinstall import add_reinstall_reports, reinstall_inventory
 from .collect_tier1 import CollectionResult, collect_tier1
 from .collect_workbuddy import collect_workbuddy
 from .config import MachineConfig
+from .guided import AGENT_LABELS, KIND_LABELS, REASON_LABELS
 from .paths import norm
 
 
@@ -79,13 +80,13 @@ class BackupPlan:
 def _summary(writer: BundleWriter, projects: ProjectResult, exclusions: list[dict[str, Any]],
              warnings: list[dict[str, Any]], software: dict[str, Any]) -> str:
     lines = ["# AI 助手备份摘要", "", "## 已纳入", ""]
-    counts = Counter((item["agent"], item["tier"]) for item in writer.entries)
-    lines.extend(f"- {agent}：{tier} 档 {count} 条。" for (agent, tier), count in sorted(counts.items()))
-    lines += [f"- 核心项目 {len(projects.projects)} 个；已不存在的登记路径 {projects.dead_registered} 个。", "",
+    counts = Counter((item["agent"], item["kind"]) for item in writer.entries if item["kind"] != "report")
+    lines.extend(f"- {AGENT_LABELS[agent]} {KIND_LABELS[kind]}：{count} 个文件。" for (agent, kind), count in sorted(counts.items()))
+    lines += [f"- 工作文件夹 {len(projects.projects)} 个；这台电脑上找不到的登记文件夹 {projects.dead_registered} 个。", "",
               "## 未备份清单（请核对）", "",
               "- 登录文件、密钥、Cookie、会话正文／数据库、缓存和运行目录不进入此包。",
               "- 第三方技能、插件和 MCP 按 reinstall.md 重装；登录项按 login-checklist.md 重新填写。"]
-    lines.extend(f"- **{item['reason']}**：{item['logical_path']}" for item in exclusions)
+    lines.extend(f"- **{REASON_LABELS.get(item['reason'], '需要人工核对')}**：{item.get('source_path', item['logical_path'])}" for item in exclusions)
     if not exclusions:
         lines.append("- 本次未发现额外排除的已选文件。")
     lines += ["", "## 规则重复与绝对路径", ""]
@@ -98,14 +99,18 @@ def _summary(writer: BundleWriter, projects: ProjectResult, exclusions: list[dic
                 lines.append(f"- {item['logical_path']}：含绝对路径标记 {flag.split(':')[1]} 处，请在新机器核对。")
     lines += ["", "## 提醒", ""]
     lines.extend(f"- {warning['code']}：{warning['message']}" for warning in warnings)
-    lines.extend(f"- 软件版本未核实：{item}" for item in software.get("unverified", []))
+    version_names = {"codex_desktop_version": "Codex 桌面版", "cc_switch_version": "CC Switch",
+                     "claude_desktop_claude_code_versions": "Claude 内置命令工具"}
+    lines.extend(f"- 软件版本未核实：{version_names.get(item, '一项本机软件')}" for item in software.get("unverified", []))
     if any(item["agent"] in {"workbuddy", "workbuddy-ai"} for item in writer.entries):
         lines.append("- WorkBuddy 文本为手动还原候选，自动加载尚未验证。")
     lines += ["",
               "## 如何在新机器还原", "",
-              "保留完整 zip，先安装并启动对应助手一次。恢复功能正在实现；新手入口待提供。",
+              "保留完整备份文件，先在新电脑安装并启动对应助手一次。恢复功能正在实现；新手入口待提供。",
+              "当前版本还不能恢复，请保留备份文件并等待恢复入口。", "",
+              "<details><summary>详细信息（技术支持）</summary>", "",
               "后续专家入口为 `python scripts/machine.py preflight --bundle <备份文件>`，核对后再执行 restore。",
-              "当前版本尚未提供恢复命令，请等待恢复阶段验收。", ""]
+              "当前版本尚未提供上述恢复命令。", "", "</details>", ""]
     return "\n".join(lines)
 
 

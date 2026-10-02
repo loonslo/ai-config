@@ -4,9 +4,9 @@ updated: 2026-10-02
 status: active
 overview: 当前转向离线换机迁移工具包，目标是备份并恢复 AI 助手配置、记忆和项目状态；旧桌面客户端及服务器同步方向已冻结。
 progress: >-
-  2026-10-02 完成换机任务入口与旧方向冻结标记；MK-01 经当次授权分四个主题提交并推送到私有 wip/machine-kit-baseline。MK-02 本机 Python 3.14 核心环境全量回归 349 passed／2 skipped；首次跨平台 CI 因缺 tmp 目录而未运行测试，修复待推送复测。P1 路径、分档、可选配置、zip 格式与夹具通过；MK-10 已授权只读路径核对在有登记键的转录目录上 8/8 一致，另有 7 个目录无对应键。P2 已实现批准范围的 Claude/Codex/WorkBuddy 采集、项目档案、软件与重装／登录报告及备份命令；WorkBuddy 保守分档经 G7 批准，恢复标为 manual。完整组包和启动器沙箱 59 passed；真机 CLI 只读内存预览为 11 个核心项目、200 条、排除 3／提醒 0，已选源文件二次哈希／mtime 核对通过。历史基线差异按当前快照记录；真实 zip 写入、U 盘和恢复仍未验收。旧 DT 仅保留历史。
+  2026-10-02 完成换机任务入口与旧方向冻结标记；MK-01 经当次授权分四个主题提交并推送到私有 wip/machine-kit-baseline。MK-02 本机 Python 3.14 核心环境全量回归 349 passed／2 skipped；首次跨平台 CI 因缺 tmp 目录而未运行测试，修复待推送复测。P1 路径、分档、可选配置、zip 格式与夹具通过；MK-10 已授权只读路径核对在有登记键的转录目录上 8/8 一致，另有 7 个目录无对应键。P2 已实现批准范围的 Claude/Codex/WorkBuddy 采集、项目档案、软件与重装／登录报告及备份命令；WorkBuddy 保守分档经 G7 批准，恢复标为 manual。完整组包、向导和启动器隔离测试 66 passed；G3 真机备份生成 723584 B 的 zip，11 个核心项目、200 条、排除 3／提醒 0，源文件前后哈希／mtime 与包校验通过；负责人过目并确认 M1 范围。历史基线差异按当前快照记录；U 盘、恢复与真实加载仍未验收。旧 DT 仅保留历史。
 next: >-
-  按 MACHINE-MIGRATION-TASKS.md 完成 MK-26 的 G3 真机备份与 M1 人工核对，再推进新手入口和还原阶段。修复后的 CI 待授权推送核验；Claude Desktop 登记目录为空与 WorkBuddy 加载机制仍待核实。每次真机写入按对应门禁执行，结果先写任务与验收记录。
+  按 MACHINE-MIGRATION-TASKS.md 推进 MK-28 新手启动入口与已获 M1 确认的 P3 恢复阶段；真实目标写入须单独 G4。修复后的 CI 待授权推送核验；Claude Desktop 登记目录为空与 WorkBuddy 加载机制仍待核实。每次真机写入按对应门禁执行，结果先写任务与验收记录。
 evidence:
   - MACHINE-MIGRATION-TASKS.md
   - sync_core/machine/paths.py
@@ -29,6 +29,9 @@ evidence:
   - tests/test_machine_collect_login.py
   - sync_core/machine/backup.py
   - tests/test_machine_backup.py
+  - sync_core/machine/guided.py
+  - sync_core/machine/guide_backup.py
+  - tests/test_machine_guided_backup.py
   - scripts/machine.py
   - ai-config.ps1
   - ai-config.command
@@ -104,3 +107,5 @@ evidence:
 2026-10-01 设置页修订维护：本次实际通过前端构建／lint、41 项定向核心测试、使用虚构路径的浏览器布局检查和 Windows 安装包重建。原生安装与真实 Agent 加载没有复测；同日先前 sidecar／服务器实现及版权收集属于保留历史证据。新安装包／旧包备份／哈希以 docs/acceptance.md 本次新增节为准，上文同日产物数值是修订前历史值。未调用外部日常库同步工具。
 
 本次交付前摘要字段与 50 项稳定 evidence 路径自检通过；未使用外部日常同步工具。该检查不代表未执行的实机验收完成。
+
+2026-10-02 MK-26／27：G3 首份真机备份与 M1 人工核对已通过，新手备份向导隔离测试通过；上文只读预览／尚未生成真实备份的表述属于同日早先过程。恢复、双击真机、U 盘及跨机加载尚未验收；本次未使用外部日常库同步工具。

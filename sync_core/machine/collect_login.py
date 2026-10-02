@@ -72,7 +72,7 @@ def login_checklist(*, home: Path, environ: Mapping[str, str] | None = None,
                 if isinstance(key, str) and _ENV.fullmatch(key):
                     lines.append(f"- Codex 环境变量 `{key}`：从原服务控制台或个人安全存储重新填写。")
     if (home / ".cc-switch").exists() and "claude" in agents:
-        lines.append("- CC Switch providers：在新机器重新添加服务提供方，并从各服务控制台取得凭据；本备份不含其数据库或设置。")
+        lines.append("- CC Switch 服务配置：在新机器重新添加服务提供方，并从各服务控制台取得凭据；本备份不含其数据库或设置。")
     credential_keys = _git_credential_keys() if git_keys is None else git_keys
     if credential_keys or (home / ".git-credentials").exists():
         lines.append("- Git 凭据管理器：在新机器重新认证；不要复制凭据文件。")
@@ -84,12 +84,12 @@ def login_checklist(*, home: Path, environ: Mapping[str, str] | None = None,
         (path.name in {"id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"} or path.suffix == ".pem")
         for path in ssh.iterdir()
     ):
-        lines.append("- SSH 私钥：由你自行通过安全方式转移，备份包不包含私钥；在新机器核对权限和公钥登记。")
+        lines.append("- SSH 私钥：由你自行通过安全方式转移，备份文件不包含私钥；在新机器核对权限和公钥登记。")
     for host in sorted(set(mcp_hosts or [])):
         if isinstance(host, str) and _HOST.fullmatch(host):
             lines.append(f"- MCP OAuth `{host}`：在新机器打开对应服务重新授权。")
     if any((home / f".{name}").exists() for name in ("workbuddy", "workbuddy-ai") if name in agents):
-        lines.append("- WorkBuddy：在新机器登录相应实例；账户与连接器状态不在备份包中。")
+        lines.append("- WorkBuddy：在新机器登录相应应用；账户与连接器信息不在备份文件中。")
     return "\n".join(lines) + "\n"
 
 

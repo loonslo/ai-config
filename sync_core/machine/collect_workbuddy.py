@@ -77,10 +77,10 @@ def _add(writer: BundleWriter, result: CollectionResult, *, source: Path, bounda
         except UnicodeDecodeError:
             text = None
     if text is None:
-        result.exclusions.append({"logical_path": logical, "reason": "non_text", "size": len(data), "sha256": digest})
+        result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "non_text", "size": len(data), "sha256": digest})
         return
     if SECRET.search(text):
-        result.exclusions.append({"logical_path": logical, "reason": "secret_hit"})
+        result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "secret_hit"})
         return
     writer.add_file(archive, data, agent=instance, instance=instance, kind=item.kind,
                     logical_path=logical, project_id=pid, restore="manual", flags=_flags(data, rules=False))

@@ -121,7 +121,7 @@ def _add_whole(writer: BundleWriter, result: CollectionResult, *, agent: str, so
     logical = f"{agent}:main/{relative}"
     try:
         if source.stat().st_size > MAX_FILE_BYTES:
-            result.exclusions.append({"logical_path": logical, "reason": "too_large"})
+            result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "too_large"})
             return
         data = _read(source, boundary)
         result.source_fingerprints[source] = (hashlib.sha256(data).hexdigest(), source.stat().st_mtime_ns, boundary)
@@ -131,11 +131,11 @@ def _add_whole(writer: BundleWriter, result: CollectionResult, *, agent: str, so
     flags = _flags(data, rules=item.kind == "rules")
     is_text = "nontext" not in flags
     if item.kind == "skills_text" and not is_text:
-        result.exclusions.append({"logical_path": logical, "reason": "non_text", "size": len(data),
+        result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "non_text", "size": len(data),
                                   "sha256": hashlib.sha256(data).hexdigest()})
         return
     if SECRET.search(data.decode("utf-8", errors="replace")) and source not in allow_secret_hit_paths:
-        result.exclusions.append({"logical_path": logical, "reason": "secret_hit"})
+        result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "secret_hit"})
         return
     archive_path = (f"files/{agent}/main/{relative}" if project is None
                     else f"files/projects/{project}/claude/memory/{archive_relative or source.name}")
@@ -143,7 +143,7 @@ def _add_whole(writer: BundleWriter, result: CollectionResult, *, agent: str, so
         writer.add_file(archive_path, data, agent=agent, instance="main", kind=item.kind,
                         logical_path=logical, project_id=project, flags=flags)
     except BundleError:
-        result.exclusions.append({"logical_path": logical, "reason": "too_large"})
+        result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "too_large"})
         return
     result.files_by_kind[item.kind] = result.files_by_kind.get(item.kind, 0) + 1
 

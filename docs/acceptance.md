@@ -451,3 +451,19 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 - 沙箱：`py -3.14 -B -m pytest tests/test_machine_backup.py tests/test_machine_catalog.py tests/test_machine_collect_workbuddy.py tests/test_launchers.py -q --basetemp tmp/run-mk26-20261002-a` 为 **11 passed，5.79 秒**；全 machine 文件列表加 `tests/test_launchers.py`、`--basetemp tmp/run-mk26-20261002-b` 为 **59 passed，11.01 秒**。验证完整 zip、六份报告、哨兵零出现、源目录不变、内容标识稳定、单助手零越界读取、禁止源目录内输出、预览后源文件变化拒绝写入。此前旧 WorkBuddy 草案断言导致 1 failed／49 passed，已按本次批准范围修正后通过。
 - 真机 CLI 只读预览：使用被 Git 忽略的本地配置指定 D12 的 11 个项目，目标桌面、文件前缀 `AI备份`；命令退出码 **3**，符合预览约定。内存共 **200 条**：Claude 79、Codex 38、WorkBuddy 12、WorkBuddy AI 65、报告 6；①档 192、②档 8；排除 3、提醒 0，已选源文件二次核对通过。没有生成桌面 zip。第一次外围脚本错误地按 UTF-8 解码 Windows 本地编码输出，CLI 本身正常退出；外围调用改用 `-X utf8` 后读取成功，文件名前缀也核对为正确 Unicode。真实 `--apply`、zip 大小／SHA-256、U 盘和 M1 人工核对仍待 G3 与后续验收。
 - 最终复测加入 WorkBuddy 路径标记与正确的 MEMORY 分类后，`--basetemp tmp/run-mk26-20261002-c` 为 **59 passed，12.17 秒**。秘密扫描 0 findings，`git diff --check`、`compileall`、PowerShell 原生语法解析（0 errors）与 Git Bash `bash -n ai-config.command` 通过；PowerShell 文件为 CRLF。项目内摘要契约 74 个稳定 evidence 路径与必填／唯一字段、日期、状态检查通过；未使用外部日常同步工具。`origin` 所属 `loonslo/ai-config` 再核对为 PRIVATE；未作本轮推送。
+
+### MK-26 真机备份与 M1（2026-10-02）
+
+- 本次 G3 明确授权后运行 `py -3.14 -X utf8 -B scripts/machine.py backup --config <Git 忽略的本地配置> --out <用户桌面> --name AI备份 --apply --json`，Windows／Python 3.14.0，退出 0。唯一新增桌面文件 `AI备份-20261002-084533.zip`：**723584 B**（小于 5 MiB），**200 条、11 个项目**；Claude 79、Codex 38、WorkBuddy 12、WorkBuddy AI 65、报告 6；①档 192、②档 8。排除 3（疑似凭据 2、非文本 1），采集提醒 0。
+- SHA-256 `9c3fdab00f7a706491f51520df6889c84cb6dc8bd98417ff230d68804b878002`；content_id `c21ce1678095fce613e468107c0f43e88ddbaa871b232beafb923ddcebbc0c81`。写前／写后已采集源文件 hash／mtime 全部一致；发布时及独立复核的 `validate_bundle` 均通过，独立 SHA-256 一致。未改写助手源数据。
+- 从 ZIP 仅读取 `reports/summary.md` 到被 Git 忽略的临时审阅文件并打开，ZIP 与摘要交负责人过目；负责人本次会话明确“确认范围，继续 P3”，**M1 通过**。临时报告和真实个人内容不进入 Git 或 PROJECT_STATUS evidence。
+- 当前快照允许日常变化；旧基线差异与未知桌面版本已注明。不代表可恢复、助手加载成功、U 盘发布或跨机验收通过。
+
+### MK-27 新手备份向导（2026-10-02）
+
+- `guided.py` 提供可注入问答、禁用词扫描、路径拖入清洗、桌面解析及本地时间；Windows 使用 SHGetKnownFolderPath 的 Desktop ID，并依次回退已有 Desktop／主目录。`guide_backup.py` 复用同一备份引擎，按助手与存在的工作文件夹选择，排除主目录本身／配置排除项，只有最终确认后写新 ZIP。无配置也能运行；异常画面及日志不记录异常值、局部变量或个人正文。摘要／登录清单正文同步改为普通用语；高级命令放折叠详细信息。
+- 官方接口核对：<https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetknownfolderpath>、<https://learn.microsoft.com/en-us/windows/win32/shell/knownfolderid>（2026-10-02）；Desktop GUID 为 B4BFCC3A-DB2C-424C-B029-7FE99A87C641。
+- 隔离 HOME、全新目录运行全 machine 测试与 `tests/test_launchers.py`：`py -3.14 -B -m pytest <tests/test_machine_*.py 文件列表> tests/test_launchers.py -q --basetemp tmp/run-mk27-20261002-b` → **66 passed，21.27 秒**。新增向导 7 项覆盖全程回车与专家 content_id 一致、最终确认前 q 零写入、无配置、少选助手零读取、桌面各级及禁止源目录内输出的回退、拖入路径、异常哨兵不泄露；源目录保持原样、ZIP 校验与哨兵检查通过。后续补入工作文件夹排除断言的定向复测另记。
+- `scripts/machine.py guide --help` 正常，仅公开 backup 选择。真实双击及未改过执行策略的环境仍待 MK-28／44，macOS 待 MK-61；未以沙箱替代实机验收。
+
+- MK-27 最后定向复测（补入主目录／不存在／重复／scratch 工作目录过滤断言）：`py -3.14 -B -m pytest tests/test_machine_guided_backup.py -q --basetemp tmp/run-mk27-20261002-c` → 7 passed。秘密扫描 0 findings，diff 检查通过；本地摘要契约 77 个证据路径及字段检查通过，未调用外部同步工具。
