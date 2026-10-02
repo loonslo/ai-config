@@ -502,3 +502,10 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 - 按已批准 manual 分档，默认跳过 WorkBuddy；专家显式 --workbuddy-files 才将批准的人设／记忆／技能安全文本按原相对路径写回两个独立实例及映射后的项目。仍用 MK-31 的进程门禁／事务；没有 settings 字段、AGENTS.md、应用标记或账户文件写入。结果明确要求打开 WorkBuddy 核对加载，文本落盘不代表自动加载。
 - `tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_workbuddy_restore.py -q --basetemp tmp/run-mk34-20261002-b`：**1 passed，3.31 秒**。验证默认不写、显式恢复原样字节及项目相对目录；keyblob／security／app／数据库／settings 诱饵零读取、字节不变；未新建 AGENTS.md 或迁移标记。初次用例错误调用 ReadTracker 不存在的 close，删去后通过（零读取断言在测试主动核对诱饵字节之前执行）。
 - 真实 WorkBuddy 加载／人工识别仍未验收，MK-34 保持部分完成。
+
+### MK-35／MK-36 自动核验与撤销（2026-10-02）
+
+- verify 逐条核对恢复后的规则／记忆／本地权限／WorkBuddy 原样字节、实际选中的白名单字段和 Codex 信任，支持部分助手 SKIP；主版本核对、重装清单完成标记独立记录。登录、实际加载、未选择的确认项仍 MANUAL，不冒充 PASS。规则问答从不少于 12 字的唯一行随机选取，提供新会话问题与原句对照；未读取会话事件或写 hook（G6 可选项未执行）。
+- undo 仅列 machine_restore 的未撤销记录；共用 select_operation 增加可选 operation_filter（默认旧行为不变），使用 plan_restore＋transaction，不调用旧 restore()。撤销前校验备份限定于 state/backups、数字文件名与已记录目标边界，拒绝链接／后续修改／运行程序；撤销写后核对字节，并以 machine_undo 记录避免重复撤销。新建文件删除，原文件逐字节恢复；目录可以保留为空，不声称删除整个工作目录。
+- `tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_verify_undo.py tests/test_ux_flows.py tests/test_machine_import_direction.py -q --basetemp tmp/run-mk35-36-20261002-c`：**54 passed，20.48 秒**。完整沙箱恢复含确认设置、信任、记忆、WorkBuddy；自动项一致，破坏规则文件 FAIL，撤销拒绝后续修改，修复后完整撤销，目标文件回到之前字节，再次检查状态与还原前一致；共用旧撤销接口回归通过。上一轮错误指定不存在的 tests/test_restore.py，0 项运行，随后改为现有接口回归文件。
+- 真实目标／净室撤销仍未运行，MK-36 保持部分完成；本次未读取真实助手目录。专家 verify／undo 接口已提供，真实 apply 仍需 G4。

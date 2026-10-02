@@ -93,12 +93,13 @@ def _statement(journal: Mapping[str, Any], tools: list[str], count: int) -> str:
     return f"{when} 对 {tool_text} {verb}了 {count} 处更改"
 
 
-def select_operation(state_dir: Path, *, operation_id: str | None = None, index: int | None = None) -> dict[str, Any]:
+def select_operation(state_dir: Path, *, operation_id: str | None = None, index: int | None = None,
+                     operation_filter: str | tuple[str,...] | None = UNDOABLE_OPERATIONS) -> dict[str, Any]:
     """Resolve a user selection to exactly one operation.
 
     ``index`` is the 1-based position in the listing shown to the user.
     """
-    operations = recent_operations(state_dir)
+    operations = recent_operations(state_dir, operation_filter=operation_filter)
     if not operations:
         raise RestoreError("没有可恢复的配置应用记录。")
     if operation_id:

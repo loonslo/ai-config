@@ -88,10 +88,40 @@ def main(argv: list[str] | None = None) -> int:
     restore.add_argument("--codex-trust", action="store_true")
     restore.add_argument("--confirm-trust")
     restore.add_argument("--workbuddy-files", action="store_true", help="explicitly copy approved manual WorkBuddy texts")
+    verify = sub.add_parser("verify", help="check restored file hashes and selected settings")
+    verify.add_argument("--bundle", type=Path, required=True)
+    verify.add_argument("--config", type=Path)
+    verify.add_argument("--root-map", nargs="*", default=[])
+    verify.add_argument("--agents")
+    verify.add_argument("--json", action="store_true")
+    verify.add_argument("--reinstall-done", action="store_true", help="record your completed reinstall checklist")
+    undo = sub.add_parser("undo", help="preview or undo a machine restore")
+    selection = undo.add_mutually_exclusive_group()
+    selection.add_argument("--index", type=int)
+    selection.add_argument("--operation-id")
+    undo.add_argument("--apply", action="store_true")
+    undo.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     if args.command == "guide":
         return guide_backup()
-    if args.command in {"preflight", "restore"}:
+    if args.command == "undo":
+        try:
+            from sync_core.machine.undo import operations, undo as undo_machine
+            state = default_state_path()
+            if args.index is None and args.operation_id is None:
+                choices = operations(state)
+                print(json.dumps(choices, ensure_ascii=False) if args.json else
+                      "\n".join(f"{index}. {item['created_at']}，涉及 {item['change_count']} 个文件。" for index,item in enumerate(choices,1)))
+                return 2 if choices else 0
+            config = load_config()
+            report = undo_machine(state, index=args.index, operation_id=args.operation_id, apply=args.apply,
+                                  process_names=config.running_process_names)
+            print(json.dumps(report, ensure_ascii=False) if args.json else
+                  f"{'已撤销' if args.apply else '将撤销'} {report['writes']} 个文件；后续修改会受到保护。")
+            return 0 if args.apply or not report['writes'] else 3
+        except (OSError, ValueError, RuntimeError):
+            return _failure("E7412", "无法安全撤销这次恢复。", "核对文件是否有后续修改，并关闭助手后重试。", as_json=args.json)
+    if args.command in {"preflight", "restore", "verify"}:
         try:
             from sync_core.machine.bundle import validate_bundle
             import platform
@@ -107,8 +137,14 @@ def main(argv: list[str] | None = None) -> int:
                 mappings.append((old, new))
             source = validate_bundle(args.bundle)["source"]["os"]
             mapper = RootMap(tuple(mappings) + config.root_map.rules, source, system)
+            software = software_inventory(home=home)
             result = preflight(args.bundle, home=home, config=config, agents=selected,
-                               root_map=mapper, software=software_inventory(home=home))
+                               root_map=mapper, software=software)
+            if args.command == "verify":
+                from sync_core.machine.verify import verify as verify_machine
+                verification = verify_machine(result, software=software, reinstall_done=args.reinstall_done)
+                print(json.dumps(verification.report(), ensure_ascii=False) if args.json else verification.markdown())
+                return verification.exit_code
             if args.command == "restore":
                 from sync_core.machine.apply import plan_restore, apply_restore
                 plan = plan_restore(result, state=default_state_path(home=home),

@@ -37,6 +37,10 @@ evidence:
   - tests/test_machine_trust.py
   - tests/test_machine_memory_restore.py
   - tests/test_machine_workbuddy_restore.py
+  - sync_core/machine/verify.py
+  - sync_core/machine/undo.py
+  - tests/test_machine_verify_undo.py
+  - sync_core/restore.py
   - sync_core/machine/procs.py
   - tests/test_machine_preflight.py
   - tests/test_machine_guided_backup.py
@@ -136,3 +140,5 @@ evidence:
 2026-10-02 MK-33：记忆目标目录推导、大小写复用、索引冲突与原样字节的隔离测试通过；真实记忆加载尚未验收。
 
 2026-10-02 MK-34：明确选择后的 WorkBuddy 候选文本落盘沙箱通过，受保护诱饵零读取／不变；真实加载继续未验证。
+
+2026-10-02 MK-35／36：自动文件／字段核验、破坏检出及完整撤销沙箱通过，共用接口相关 54 项回归通过。登录／真实加载为人工项；净室仍未提供。

@@ -57,6 +57,7 @@ def plan_restore(check: Preflight, *, state: Path, process_names: tuple[str,...]
         raise BundleError('trust confirmation no longer matches displayed list')
     no_links(state)
     changes=PlannedChanges(state_root=state,metadata={'operation':'machine_restore','path_agents':{},
+                                                      'path_boundaries':{},
                                                       'content_id':check.manifest['content_id']})
     if codex_trust:
         changes.metadata['trust_list_hash']=confirm_trust
@@ -76,6 +77,7 @@ def plan_restore(check: Preflight, *, state: Path, process_names: tuple[str,...]
         changes[path]=data
         changes.expected[path]=digest(expected)
         changes.metadata['path_agents'][str(path)]=item.entry['agent']
+        changes.metadata['path_boundaries'][str(path)]=str(boundary)
         boundaries[path]=boundary
 
     for item in check.items:
