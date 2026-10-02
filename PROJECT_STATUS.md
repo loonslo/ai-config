@@ -6,7 +6,7 @@ overview: 当前转向离线换机迁移工具包，目标是备份并恢复 AI 
 progress: >-
   2026-10-02 完成换机任务入口与旧方向冻结标记；MK-01 经当次授权分四个主题提交并推送到私有 wip/machine-kit-baseline。MK-02 本机 Python 3.14 核心环境全量回归 349 passed／2 skipped；首次跨平台 CI 因缺 tmp 目录而未运行测试，修复待推送复测。P1 路径、分档、可选配置、zip 格式与夹具通过；MK-10 已授权只读路径核对在有登记键的转录目录上 8/8 一致，另有 7 个目录无对应键。P2 已实现批准范围的 Claude/Codex/WorkBuddy 采集、项目档案、软件与重装／登录报告及备份命令；WorkBuddy 保守分档经 G7 批准，恢复标为 manual。完整组包、向导和启动器隔离测试 66 passed；G3 真机备份生成 723584 B 的 zip，11 个核心项目、200 条、排除 3／提醒 0，源文件前后哈希／mtime 与包校验通过；负责人过目并确认 M1 范围。历史基线差异按当前快照记录；U 盘、恢复与真实加载仍未验收。旧 DT 仅保留历史。
 next: >-
-  按 MACHINE-MIGRATION-TASKS.md 推进 MK-28 新手启动入口与已获 M1 确认的 P3 恢复阶段；真实目标写入须单独 G4。修复后的 CI 待授权推送核验；Claude Desktop 登记目录为空与 WorkBuddy 加载机制仍待核实。每次真机写入按对应门禁执行，结果先写任务与验收记录。
+  按 MACHINE-MIGRATION-TASKS.md 推进已获 M1 确认的 P3 恢复阶段；MK-28 实现与 14 项测试通过，真实双击另需 G3＋G2，真实目标写入须单独 G4。修复后的 CI 待授权推送核验；Claude Desktop 登记目录为空与 WorkBuddy 加载机制仍待核实。每次真机写入按对应门禁执行，结果先写任务与验收记录。
 evidence:
   - MACHINE-MIGRATION-TASKS.md
   - sync_core/machine/paths.py
@@ -33,6 +33,13 @@ evidence:
   - sync_core/machine/guide_backup.py
   - tests/test_machine_guided_backup.py
   - scripts/machine.py
+  - scripts/start.py
+  - tests/test_start_bootstrap.py
+  - tests/test_launchers.py
+  - 备份.cmd
+  - 备份.command
+  - docs/quickstart.md
+  - docs/python-required.txt
   - ai-config.ps1
   - ai-config.command
   - DESKTOP-TASKS.md
@@ -109,3 +116,5 @@ evidence:
 本次交付前摘要字段与 50 项稳定 evidence 路径自检通过；未使用外部日常同步工具。该检查不代表未执行的实机验收完成。
 
 2026-10-02 MK-26／27：G3 首份真机备份与 M1 人工核对已通过，新手备份向导隔离测试通过；上文只读预览／尚未生成真实备份的表述属于同日早先过程。恢复、双击真机、U 盘及跨机加载尚未验收；本次未使用外部日常库同步工具。
+
+2026-10-02 MK-28：双击入口与运行环境引导实现，14 项隔离／静态测试及 cmd.exe 提示片段检查通过；真实双击、Windows Terminal、默认执行策略、拦截及 Mac 尚未验收。

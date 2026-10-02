@@ -467,3 +467,10 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 - `scripts/machine.py guide --help` 正常，仅公开 backup 选择。真实双击及未改过执行策略的环境仍待 MK-28／44，macOS 待 MK-61；未以沙箱替代实机验收。
 
 - MK-27 最后定向复测（补入主目录／不存在／重复／scratch 工作目录过滤断言）：`py -3.14 -B -m pytest tests/test_machine_guided_backup.py -q --basetemp tmp/run-mk27-20261002-c` → 7 passed。秘密扫描 0 findings，diff 检查通过；本地摘要契约 77 个证据路径及字段检查通过，未调用外部同步工具。
+
+### MK-28 启动器实现（2026-10-02）
+
+- 标准库 `scripts/start.py` 共用仓库 .venv 与大小写不敏感的 requirements SHA-256 戳记，低于 Python 3.11／找不到 Python／建环境失败／安装失败均三段式说明并退出 2，只在项目 .venv 安装依赖；参数原样传给 machine.py。Windows `备份.cmd` 为 ASCII／CRLF，不调用 .ps1 或修改执行策略；缺 Python 的说明来自 UTF-8 BOM 文本，由内联 PowerShell 输出。成功及向导取消／失败已在结果页等回车，只有准备失败追加 pause，保证正常流程五次回车。Mac 两个 .command 已设 Git 100755／LF。quickstart 为一页备份说明，恢复入口与系统拦截未实测项明确保留。
+- `py -3.14 -B -m pytest tests/test_start_bootstrap.py tests/test_launchers.py -q --basetemp tmp/run-mk28-20261002-a`：**14 passed，0.26 秒**。用假的进程执行器验证 stamp 只在安装成功后写入、就绪不重装、失败边界和含中文／空格路径的参数传递；旧启动器用例保留。Git Bash `bash -n` 两个 .command 通过；秘密扫描 0 findings、diff 检查通过。
+- 本机 cmd.exe 仅读运行缺 Python 提示片段，退出 0、中文三段式完整；外围首次转义失败、随后错误使用 GBK 解码，改用脚本文件与 UTF-8 后核对成功。没有运行实际 guide backup，没有读取真实助手路径或写 zip。此检查不是 Windows Terminal 或资源管理器双击验收，也不代表默认执行策略／SmartScreen／Mac 已通过。
+- MK-28 真机另需本次 G3＋G2；资源管理器双击需实机操作。当前未获该授权，保持部分完成；恢复实现可按已确认 M1 范围继续。

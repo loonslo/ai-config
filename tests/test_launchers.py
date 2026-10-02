@@ -6,6 +6,10 @@ directory, reuse a project-local environment, and never mutate the system.
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
+import subprocess
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 PS1 = (ROOT / "ai-config.ps1").read_text(encoding="utf-8")
@@ -56,3 +60,25 @@ def test_launchers_exit_nonzero_with_an_actionable_message_when_unusable():
     assert "原有数据" in PS1
     assert "下一步" in PS1
     assert "fail " in COMMAND or "exit 2" in COMMAND
+
+
+def test_beginner_windows_launcher_ascii_crlf_and_safe_entry():
+    raw = (ROOT / '备份.cmd').read_bytes()
+    text = raw.decode('ascii')
+    assert b'\r\n' in raw and b'\n' not in raw.replace(b'\r\n', b'')
+    assert 'pause' in text.casefold()
+    assert 'ExecutionPolicy' not in text
+    assert '.ps1' not in text
+    assert 'scripts\\start.py' in text
+    assert text.index('py -3 -c') < text.index('python -c')
+
+
+def test_beginner_mac_launchers_lf_and_executable_in_git():
+    for name in ('ai-config.command', '备份.command'):
+        assert b'\r' not in (ROOT / name).read_bytes()
+        if not shutil.which('git') or not (ROOT / '.git').exists():
+            pytest.skip('git checkout unavailable')
+        result = subprocess.run(['git', 'ls-files', '--stage', '--', name], cwd=ROOT,
+                                capture_output=True, text=True, encoding='utf-8')
+        assert result.returncode == 0
+        assert result.stdout.startswith('100755 ')
