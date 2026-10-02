@@ -480,3 +480,9 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 - 只读解析经过有界校验的 ZIP，重新按分档目录约束生成目标，拒绝未知字段／目录、受保护名称、父路径跳转、链接与 Windows 特殊文件名。核心项目与记忆 Git 根分开映射；记忆目录按目标 Git 根重新推导并复用 Windows 大小写变体。目标助手未初始化时 blocked，不创建目录；已初始化但空的目标为 new（此边界优先于任务中“空 HOME 全 new”的简写）。按字段比较设置，生成信任与安全设置清单哈希；可输出普通用语检查／后续清单。进程检测可注入，软件主版本不符／缺失有提示。
 - `py -3.14 -B -m pytest tests/test_machine_preflight.py tests/test_machine_import_direction.py -q --basetemp tmp/run-mk30-20261002-c`：**5 passed，7.17 秒**。覆盖 new／differs／找不到项目、目标零变化、缺助手根、单助手筛选、运行程序、危险路径、Windows→Mac 样例。前两轮揭示记忆条目实际位于 files/projects 与测试目标未初始化 Git 根的问题，按实际采集格式与目标 Git 初始化修正后通过。
 - 新增专家 preflight 命令，默认只打印；显式 out-dir 可在源目录之外新增两份报告，已有报告拒绝覆盖。未访问真实目标 HOME、未运行 restore、未验证真实 Mac。
+
+### MK-31 恢复写入核心（2026-10-02）
+
+- 预先构造 PlannedChanges，保留检查时目标 hash；白名单字段合并保留未知设置，默认保留不同字段，整文件冲突写 .from-bundle（该位置已存在且不同则跳过）。只有明确 overwrite／prefer-bundle 才替换，confirm 类未确认则跳过；安全清单可绑定哈希。所有写入通过现有 transaction 的锁、写前备份和 journal；写前及逐文件重新拒绝路径链接、运行中的应用、目标变化，写后重读核对。权限文件被 Git 跟踪只提醒。缺助手根或项目不创建。真实写入仍须 G4。
+- 初次全局 Python 3.14 缺 tomlkit，测试 collection 失败；改用既有核心隔离环境（Python 3.14、requirements-test 已安装），不安装全局依赖：`tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_apply.py tests/test_machine_preflight.py -q --basetemp tmp/run-mk31-20261002-b` → **5 passed，14.53 秒**。验证初次恢复、重复无操作、冲突保留＋另存、明确覆盖、进程拒绝、目标后续修改拒绝及中途失败回滚。只写夹具 HOME。
+- 记忆、信任与 WorkBuddy 扩展在 MK-32…34 实现；WorkBuddy manual 文本默认不写，新增显式 --workbuddy-files 仅复制批准候选并保留人工加载核验，避免把 G7 的 manual 分档变成默认自动恢复。专家 restore 默认只打印计划。

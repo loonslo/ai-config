@@ -17,6 +17,7 @@ from sync_core.machine.preflight import preflight
 from sync_core.machine.paths import RootMap
 from sync_core.machine.collect_records import software_inventory
 from sync_core.machine.backup import validate_output, agent_roots
+from sync_core.layout import default_state_path
 from sync_core.messages import Message
 
 
@@ -74,10 +75,23 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--agents")
     check.add_argument("--out-dir", type=Path)
     check.add_argument("--json", action="store_true")
+    restore = sub.add_parser("restore", help="preview or restore approved backup files")
+    restore.add_argument("--bundle", type=Path, required=True)
+    restore.add_argument("--config", type=Path)
+    restore.add_argument("--root-map", nargs="*", default=[])
+    restore.add_argument("--agents")
+    restore.add_argument("--json", action="store_true")
+    restore.add_argument("--apply", action="store_true")
+    restore.add_argument("--overwrite", nargs="*", type=Path, default=[])
+    restore.add_argument("--prefer-bundle", nargs="*", default=[])
+    restore.add_argument("--confirm-security", action="store_true")
+    restore.add_argument("--codex-trust", action="store_true")
+    restore.add_argument("--confirm-trust")
+    restore.add_argument("--workbuddy-files", action="store_true", help="explicitly copy approved manual WorkBuddy texts")
     args = parser.parse_args(argv)
     if args.command == "guide":
         return guide_backup()
-    if args.command == "preflight":
+    if args.command in {"preflight", "restore"}:
         try:
             from sync_core.machine.bundle import validate_bundle
             import platform
@@ -95,6 +109,17 @@ def main(argv: list[str] | None = None) -> int:
             mapper = RootMap(tuple(mappings) + config.root_map.rules, source, system)
             result = preflight(args.bundle, home=home, config=config, agents=selected,
                                root_map=mapper, software=software_inventory(home=home))
+            if args.command == "restore":
+                from sync_core.machine.apply import plan_restore, apply_restore
+                plan = plan_restore(result, state=default_state_path(home=home),
+                                    process_names=config.running_process_names, overwrite=args.overwrite,
+                                    prefer_bundle=args.prefer_bundle, confirm_security=args.confirm_security,
+                                    codex_trust=args.codex_trust, confirm_trust=args.confirm_trust,
+                                    workbuddy_files=args.workbuddy_files)
+                report = apply_restore(plan) if args.apply else plan.report()
+                print(json.dumps(report, ensure_ascii=False, sort_keys=True) if args.json else
+                      f"{'已处理' if args.apply else '检查完成'}：新增或调整 {report['writes']} 个文件，内容不同 {len(report['conflicts'])} 项，跳过 {len(report['skipped'])} 项。原有版本按冲突选择保留，写入前均有备份。")
+                return 4 if report['conflicts'] or report['skipped'] or result.running else 3 if not args.apply and plan.changes else 0
             if args.out_dir is not None:
                 output = validate_output(args.out_dir, roots=tuple(agent_roots(home, config, os.environ).values()),
                                          projects=tuple(path for path in result.projects.values() if path is not None))
