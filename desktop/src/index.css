@@ -1,0 +1,24 @@
+:root {
+  --font-ui: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --text-small: .875rem;
+  --text-body: 1rem;
+  --text-heading: 1.125rem;
+  font-family: var(--font-ui);
+  color: #e8edf4;
+  background: #101419;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.6;
+  color-scheme: dark;
+  font-feature-settings: 'ss01' on;
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; min-width: 360px; min-height: 100vh; }
+button { font: inherit; }

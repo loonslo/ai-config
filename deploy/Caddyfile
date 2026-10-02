@@ -1,0 +1,6 @@
+{$AI_SYNC_DOMAIN} {
+    request_body {
+        max_size 5MB
+    }
+    reverse_proxy api:8000
+}

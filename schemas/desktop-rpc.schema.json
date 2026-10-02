@@ -1,0 +1,1353 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-config.local/schemas/desktop-rpc.schema.json",
+  "title": "ai-config desktop sidecar JSON-lines protocol",
+  "description": "One JSON object per input/output line. Python performs additional operation-specific validation and never accepts shell commands.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/previewRequest"
+    },
+    {
+      "$ref": "#/$defs/applyRequest"
+    },
+    {
+      "$ref": "#/$defs/cancelRequest"
+    },
+    {
+      "$ref": "#/$defs/shutdownRequest"
+    },
+    {
+      "$ref": "#/$defs/acceptedEvent"
+    },
+    {
+      "$ref": "#/$defs/progressEvent"
+    },
+    {
+      "$ref": "#/$defs/cancelResultEvent"
+    },
+    {
+      "$ref": "#/$defs/shutdownAcceptedEvent"
+    },
+    {
+      "$ref": "#/$defs/resultEvent"
+    }
+  ],
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requestBase": {
+      "type": "object",
+      "required": [
+        "protocol_version",
+        "request_id",
+        "type"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": 1
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "previewRequest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/requestBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "operation"
+          ],
+          "properties": {
+            "type": {
+              "const": "preview"
+            },
+            "operation": {
+              "enum": [
+                "import_config",
+                "package_import",
+                "package_export",
+                "package_capabilities",
+                "extension_capture",
+                "cloud",
+                "portable_restore",
+                "portable_project",
+                "git_transport",
+                "setup",
+                "rule_library",
+                "save_rule",
+                "quick",
+                "rules",
+                "config",
+                "memory",
+                "scan",
+                "migrate",
+                "declare",
+                "sync",
+                "status",
+                "diff",
+                "detach",
+                "verify_load",
+                "undo",
+                "doctor",
+                "inventory",
+                "snapshots",
+                "memory_setup",
+                "project",
+                "project_setup",
+                "restore_snapshot",
+                "start",
+                "finish"
+              ]
+            },
+            "params": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "package_path": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "destination": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "format": {
+                  "enum": [
+                    "archive",
+                    "directory"
+                  ]
+                },
+                "selected_sources": {
+                  "type": "array",
+                  "maxItems": 1024,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  }
+                },
+                "apply_to_agents": {
+                  "type": "boolean"
+                },
+                "decisions": {
+                  "type": "object",
+                  "maxProperties": 1024,
+                  "propertyNames": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "additionalProperties": {
+                    "enum": [
+                      "keep_local",
+                      "use_package",
+                      "manual_merge"
+                    ]
+                  }
+                },
+                "manual_values": {
+                  "type": "object",
+                  "maxProperties": 256,
+                  "propertyNames": {
+                    "type": "string",
+                    "maxLength": 2048
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "maxLength": 262144
+                  }
+                },
+                "store_path": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "remote": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "state_dir": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "memory_repo": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "topic": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "content": {
+                  "type": "string",
+                  "maxLength": 262144
+                },
+                "tools": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "tool_roots": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "additionalProperties": {
+                    "$ref": "#/$defs/nonEmptyString"
+                  }
+                },
+                "save": {
+                  "type": "boolean"
+                },
+                "item": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "choice": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "agent_id": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "root": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "entry": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "entry_mode": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "profile": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "fetch": {
+                  "type": "boolean"
+                },
+                "publish": {
+                  "type": "boolean"
+                },
+                "restore_original": {
+                  "type": "boolean"
+                },
+                "answer": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "record": {
+                  "type": "boolean"
+                },
+                "list_only": {
+                  "type": "boolean"
+                },
+                "operation_id": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "index": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "recover": {
+                  "type": "boolean"
+                },
+                "disable": {
+                  "type": "boolean"
+                },
+                "selections": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "maxProperties": 256,
+                      "additionalProperties": {
+                        "$ref": "#/$defs/nonEmptyString"
+                      }
+                    }
+                  ]
+                },
+                "project_id": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "path": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "handoff_id": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "snapshot_id": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "handoff_file": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "handoff_text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 131072
+                },
+                "kind": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "server": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "action": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "extension_kinds": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "skills",
+                      "mcp",
+                      "memory",
+                      "handoffs"
+                    ]
+                  }
+                },
+                "options": {
+                  "type": "object",
+                  "description": "Action-specific bounded options are strictly validated by the runtime."
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "import_config"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "source"
+                  ]
+                },
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "package_import"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "apply_to_agents",
+                    "decisions",
+                    "manual_values",
+                    "package_path",
+                    "selections"
+                  ]
+                },
+                "required": [
+                  "package_path"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "package_export"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "destination",
+                    "extension_kinds",
+                    "format",
+                    "selected_sources"
+                  ]
+                },
+                "required": [
+                  "destination",
+                  "format"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "package_capabilities"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "maxProperties": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "extension_capture"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "kind",
+                    "name",
+                    "profile",
+                    "source"
+                  ]
+                },
+                "required": [
+                  "kind",
+                  "name",
+                  "profile",
+                  "source"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "cloud"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "action",
+                    "options",
+                    "server"
+                  ]
+                },
+                "required": [
+                  "action",
+                  "server"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "portable_restore"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "profile",
+                    "project_id"
+                  ]
+                },
+                "required": [
+                  "profile",
+                  "project_id"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "portable_project"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "handoff_id",
+                    "profile",
+                    "project_id"
+                  ]
+                },
+                "required": [
+                  "profile",
+                  "project_id"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "git_transport"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "action"
+                  ]
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "setup"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "memory_repo",
+                    "remote",
+                    "state_dir",
+                    "store_path",
+                    "tool_roots",
+                    "tools"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "rule_library"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "maxProperties": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "save_rule"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "content",
+                    "topic"
+                  ]
+                },
+                "required": [
+                  "content",
+                  "topic"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "quick"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "maxProperties": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "rules"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "maxProperties": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "config"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "maxProperties": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "memory"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "maxProperties": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "scan"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "save"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "migrate"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "choice",
+                    "item"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "declare"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "agent_id",
+                    "entry",
+                    "entry_mode",
+                    "profile",
+                    "root"
+                  ]
+                },
+                "required": [
+                  "agent_id",
+                  "root"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "sync"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "fetch",
+                    "publish"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "status"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "maxProperties": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "diff"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "choice"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "detach"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "agent_id",
+                    "restore_original"
+                  ]
+                },
+                "required": [
+                  "agent_id"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "verify_load"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "agent_id",
+                    "answer",
+                    "record"
+                  ]
+                },
+                "required": [
+                  "agent_id"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "undo"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "index",
+                    "list_only",
+                    "operation_id"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "doctor"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "recover"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "inventory"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "save"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "snapshots"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "maxProperties": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "memory_setup"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "disable",
+                    "selections"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "project"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "handoff_id",
+                    "project_id"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "project_setup"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "path",
+                    "project_id"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "restore_snapshot"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "snapshot_id"
+                  ]
+                },
+                "required": [
+                  "snapshot_id"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "start"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "handoff_id",
+                    "project_id"
+                  ]
+                },
+                "required": [
+                  "handoff_id",
+                  "project_id"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "finish"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "propertyNames": {
+                  "enum": [
+                    "handoff_file",
+                    "handoff_text",
+                    "project_id"
+                  ]
+                },
+                "required": [
+                  "project_id"
+                ]
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "applyRequest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/requestBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "plan_id"
+          ],
+          "properties": {
+            "type": {
+              "const": "apply"
+            },
+            "plan_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "cancelRequest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/requestBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "job_id"
+          ],
+          "properties": {
+            "type": {
+              "const": "cancel"
+            },
+            "job_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "shutdownRequest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/requestBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "shutdown"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "eventBase": {
+      "type": "object",
+      "required": [
+        "protocol_version",
+        "type"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": 1
+        },
+        "request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "job_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "acceptedEvent": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "request_id",
+            "job_id"
+          ],
+          "properties": {
+            "type": {
+              "const": "accepted"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": true
+    },
+    "progressEvent": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "request_id",
+            "job_id",
+            "stage"
+          ],
+          "properties": {
+            "type": {
+              "const": "progress"
+            },
+            "stage": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": true
+    },
+    "cancelResultEvent": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "request_id",
+            "job_id",
+            "status"
+          ],
+          "properties": {
+            "type": {
+              "const": "cancel_result"
+            },
+            "status": {
+              "enum": [
+                "accepted",
+                "too_late",
+                "already_finished",
+                "not_found"
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": true
+    },
+    "shutdownAcceptedEvent": {
+      "type": "object",
+      "required": [
+        "protocol_version",
+        "request_id",
+        "type"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": 1
+        },
+        "request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "const": "shutdown_accepted"
+        }
+      },
+      "additionalProperties": false
+    },
+    "resultEvent": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "request_id",
+            "status"
+          ],
+          "properties": {
+            "type": {
+              "const": "result"
+            },
+            "status": {
+              "enum": [
+                "preview",
+                "applied",
+                "cancelled",
+                "failed"
+              ]
+            },
+            "result": {},
+            "error": {
+              "type": "object",
+              "required": [
+                "code",
+                "message"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": true
+    }
+  }
+}

@@ -1,0 +1,9 @@
+# Names and examples only. Put real values in a local secret manager / process environment.
+AI_SYNC_DOMAIN=sync.example.invalid
+AI_SYNC_STORAGE_HOST=/srv/ai-sync/packages
+AI_SYNC_OIDC_ISSUER=https://identity.example.invalid/realms/ai-sync
+AI_SYNC_OIDC_AUDIENCE=ai-config-api
+AI_SYNC_OIDC_JWKS_URL=https://identity.example.invalid/realms/ai-sync/protocol/openid-connect/certs
+AI_SYNC_QUOTA_BYTES=1073741824
+# AI_SYNC_DB_PASSWORD must be set locally.
+# AI_SYNC_DATABASE_URL must be set locally; PostgreSQL psycopg connection to db/ai_sync.

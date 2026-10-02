@@ -1,0 +1,4 @@
+-r ../requirements.txt
+cryptography==50.0.2
+httpx==0.28.1
+keyring==25.7.0

@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-config.local/schemas/package.schema.json",
+  "title": "ai-config portable package manifest v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "package_id",
+    "content_id",
+    "parent_content_id",
+    "created_at",
+    "scope",
+    "adapters",
+    "objects",
+    "entries",
+    "dependencies",
+    "exclusions"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "package_id": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+    "content_id": { "$ref": "#/$defs/sha256" },
+    "parent_content_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "scope": { "$ref": "#/$defs/scope" },
+    "adapters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/adapter" },
+      "uniqueItems": true
+    },
+    "objects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/object" },
+      "uniqueItems": true
+    },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" },
+      "uniqueItems": true
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dependency" },
+      "uniqueItems": true
+    },
+    "exclusions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/exclusion" },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "identifier": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$" },
+    "dataType": {
+      "type": "string",
+      "enum": ["rule_file", "shared_setting", "agent_declaration", "skill_file", "mcp_config", "memory_snapshot", "handoff_record"]
+    },
+    "scope": {
+      "type": "object",
+      "required": ["data_types", "agent_ids"],
+      "properties": {
+        "data_types": { "type": "array", "items": { "$ref": "#/$defs/dataType" }, "uniqueItems": true },
+        "agent_ids": { "type": "array", "items": { "$ref": "#/$defs/identifier" }, "uniqueItems": true }
+      },
+      "additionalProperties": false
+    },
+    "adapter": {
+      "type": "object",
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "version": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "object": {
+      "type": "object",
+      "required": ["path", "sha256", "size"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^objects/[a-f0-9]{64}\\.bin$" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "entry": {
+      "type": "object",
+      "required": ["logical_source", "data_type", "adapter_id", "adapter_version", "object_path"],
+      "properties": {
+        "logical_source": {
+          "type": "string",
+          "pattern": "^(agent|settings|skill|mcp|memory|handoff)://[A-Za-z0-9._~%+-]+(/[A-Za-z0-9._~%+-]+)+$"
+        },
+        "data_type": { "$ref": "#/$defs/dataType" },
+        "adapter_id": { "$ref": "#/$defs/identifier" },
+        "adapter_version": { "type": "integer", "minimum": 1 },
+        "object_path": { "type": "string", "pattern": "^objects/[a-f0-9]{64}\\.bin$" }
+      },
+      "additionalProperties": false
+    },
+    "dependency": {
+      "type": "object",
+      "required": ["id", "version", "required"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "required": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "exclusion": {
+      "type": "object",
+      "required": ["logical_source", "category"],
+      "properties": {
+        "logical_source": {
+          "type": "string",
+          "pattern": "^(agent|settings|skill|mcp|memory|handoff)://[A-Za-z0-9._~%+-]+(/[A-Za-z0-9._~%+-]+)+$"
+        },
+        "category": { "type": "string", "enum": ["sensitive", "protected", "unsupported", "local_only", "user_excluded"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

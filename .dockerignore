@@ -1,0 +1,7 @@
+**
+!server/
+!server/*.py
+!server/requirements.txt
+!server/requirements.lock.txt
+!deploy/
+!deploy/Dockerfile

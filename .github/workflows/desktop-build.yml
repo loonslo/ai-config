@@ -1,0 +1,48 @@
+name: Native desktop preview artifacts
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-14
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Windows sidecar
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/build-desktop-sidecar.ps1 -TargetTriple '${{ matrix.target }}'
+      - name: macOS sidecar
+        if: runner.os == 'macOS'
+        run: |
+          python -m pip install -r desktop/requirements-build.txt
+          python scripts/build-desktop-sidecar.py --target '${{ matrix.target }}'
+      - run: npm ci
+        working-directory: desktop
+      - name: Windows installer
+        if: runner.os == 'Windows'
+        run: npm run tauri:build
+        working-directory: desktop
+      - name: macOS bundle
+        if: runner.os == 'macOS'
+        run: npm run tauri:build -- --config src-tauri/tauri.macos.conf.json
+        working-directory: desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-config-${{ matrix.target }}-unsigned-preview
+          path: desktop/src-tauri/target/release/bundle/
