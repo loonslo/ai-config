@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -37,7 +38,7 @@ def build_machine_home(home: Path) -> dict[str, Path]:
         + "[projects.'" + native.replace("\\", "/").lower() + "']\ntrust_level = \"trusted\"\n", encoding="utf-8")
     (home / ".codex" / "skills" / "diary" / "icon.bin").write_bytes(b"\x00\xff" + SENTINEL.encode())
     db = home / ".codex" / "state_5.sqlite"
-    with sqlite3.connect(db) as connection:
+    with closing(sqlite3.connect(db)) as connection, connection:
         connection.executescript("CREATE TABLE projects(id TEXT, name TEXT); CREATE TABLE project_roots(project_id TEXT, path TEXT); CREATE TABLE threads(id TEXT, cwd TEXT);")
         connection.execute("INSERT INTO projects VALUES (?, ?)", ("p1", "sample-project"))
         connection.execute("INSERT INTO project_roots VALUES (?, ?)", ("p1", native))
