@@ -13,6 +13,10 @@ from sync_core.machine.paths import derive_project_dir
 from sync_core.machine.backup import AGENTS, apply_backup, prepare_backup
 from sync_core.machine.config import load_config
 from sync_core.machine.guide_backup import guide_backup
+from sync_core.machine.preflight import preflight
+from sync_core.machine.paths import RootMap
+from sync_core.machine.collect_records import software_inventory
+from sync_core.machine.backup import validate_output, agent_roots
 from sync_core.messages import Message
 
 
@@ -63,9 +67,45 @@ def main(argv: list[str] | None = None) -> int:
     backup.add_argument("--json", action="store_true")
     guide = sub.add_parser("guide", help="beginner interactive guide")
     guide.add_argument("operation", choices=("backup",))
+    check = sub.add_parser("preflight", help="check a backup against this computer")
+    check.add_argument("--bundle", type=Path, required=True)
+    check.add_argument("--config", type=Path)
+    check.add_argument("--root-map", nargs="*", default=[])
+    check.add_argument("--agents")
+    check.add_argument("--out-dir", type=Path)
+    check.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     if args.command == "guide":
         return guide_backup()
+    if args.command == "preflight":
+        try:
+            from sync_core.machine.bundle import validate_bundle
+            import platform
+            home = Path.home()
+            system = platform.system().lower()
+            config = load_config(args.config, home=home, target_os=system)
+            selected = frozenset(name.strip() for name in args.agents.split(",")) if args.agents is not None else None
+            mappings = []
+            for item in args.root_map:
+                old, separator, new = item.partition("=")
+                if not separator or not old or not new:
+                    raise ValueError("invalid root map")
+                mappings.append((old, new))
+            source = validate_bundle(args.bundle)["source"]["os"]
+            mapper = RootMap(tuple(mappings) + config.root_map.rules, source, system)
+            result = preflight(args.bundle, home=home, config=config, agents=selected,
+                               root_map=mapper, software=software_inventory(home=home))
+            if args.out_dir is not None:
+                output = validate_output(args.out_dir, roots=tuple(agent_roots(home, config, os.environ).values()),
+                                         projects=tuple(path for path in result.projects.values() if path is not None))
+                for name, text in (("preflight-report.md", result.markdown()), ("todo.md", result.todo())):
+                    with (output / name).open("x", encoding="utf-8") as handle:
+                        handle.write(text)
+            print(json.dumps(result.report(), ensure_ascii=False, sort_keys=True) if args.json else result.markdown())
+            counts = result.report()["counts"]
+            return 4 if result.running or counts.get("differs") or counts.get("blocked") or result.security_list or result.trust_list else 3 if counts.get("new") else 0
+        except (OSError, ValueError, KeyError, TypeError):
+            return _failure("E7410", "无法安全完成恢复前检查。", "核对备份文件、工作文件夹位置和助手安装情况后重试。", as_json=args.json)
     if args.command == "paths":
         try:
             report = check_claude_project_dirs(home=Path.home())

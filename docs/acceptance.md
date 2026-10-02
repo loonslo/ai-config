@@ -474,3 +474,9 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 - `py -3.14 -B -m pytest tests/test_start_bootstrap.py tests/test_launchers.py -q --basetemp tmp/run-mk28-20261002-a`：**14 passed，0.26 秒**。用假的进程执行器验证 stamp 只在安装成功后写入、就绪不重装、失败边界和含中文／空格路径的参数传递；旧启动器用例保留。Git Bash `bash -n` 两个 .command 通过；秘密扫描 0 findings、diff 检查通过。
 - 本机 cmd.exe 仅读运行缺 Python 提示片段，退出 0、中文三段式完整；外围首次转义失败、随后错误使用 GBK 解码，改用脚本文件与 UTF-8 后核对成功。没有运行实际 guide backup，没有读取真实助手路径或写 zip。此检查不是 Windows Terminal 或资源管理器双击验收，也不代表默认执行策略／SmartScreen／Mac 已通过。
 - MK-28 真机另需本次 G3＋G2；资源管理器双击需实机操作。当前未获该授权，保持部分完成；恢复实现可按已确认 M1 范围继续。
+
+### MK-30 恢复前检查（2026-10-02）
+
+- 只读解析经过有界校验的 ZIP，重新按分档目录约束生成目标，拒绝未知字段／目录、受保护名称、父路径跳转、链接与 Windows 特殊文件名。核心项目与记忆 Git 根分开映射；记忆目录按目标 Git 根重新推导并复用 Windows 大小写变体。目标助手未初始化时 blocked，不创建目录；已初始化但空的目标为 new（此边界优先于任务中“空 HOME 全 new”的简写）。按字段比较设置，生成信任与安全设置清单哈希；可输出普通用语检查／后续清单。进程检测可注入，软件主版本不符／缺失有提示。
+- `py -3.14 -B -m pytest tests/test_machine_preflight.py tests/test_machine_import_direction.py -q --basetemp tmp/run-mk30-20261002-c`：**5 passed，7.17 秒**。覆盖 new／differs／找不到项目、目标零变化、缺助手根、单助手筛选、运行程序、危险路径、Windows→Mac 样例。前两轮揭示记忆条目实际位于 files/projects 与测试目标未初始化 Git 根的问题，按实际采集格式与目标 Git 初始化修正后通过。
+- 新增专家 preflight 命令，默认只打印；显式 out-dir 可在源目录之外新增两份报告，已有报告拒绝覆盖。未访问真实目标 HOME、未运行 restore、未验证真实 Mac。

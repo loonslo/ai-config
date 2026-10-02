@@ -31,6 +31,9 @@ evidence:
   - tests/test_machine_backup.py
   - sync_core/machine/guided.py
   - sync_core/machine/guide_backup.py
+  - sync_core/machine/preflight.py
+  - sync_core/machine/procs.py
+  - tests/test_machine_preflight.py
   - tests/test_machine_guided_backup.py
   - scripts/machine.py
   - scripts/start.py
@@ -118,3 +121,5 @@ evidence:
 2026-10-02 MK-26／27：G3 首份真机备份与 M1 人工核对已通过，新手备份向导隔离测试通过；上文只读预览／尚未生成真实备份的表述属于同日早先过程。恢复、双击真机、U 盘及跨机加载尚未验收；本次未使用外部日常库同步工具。
 
 2026-10-02 MK-28：双击入口与运行环境引导实现，14 项隔离／静态测试及 cmd.exe 提示片段检查通过；真实双击、Windows Terminal、默认执行策略、拦截及 Mac 尚未验收。
+
+2026-10-02 MK-30：只读目标解析和逐项／字段比较的 5 项测试通过，未运行真实目标恢复；P3 正在推进。
