@@ -17,7 +17,7 @@ from .paths import RootMap
 DEFAULT_EXCLUDES = (
     ".claude/worktrees/**", "**/scratch-workspaces/**", ".chatgpt-projects/**",
 )
-DEFAULT_PROCESSES = ("Claude.exe", "Codex.exe", "WorkBuddy.exe", "WorkBuddy AI.exe", "claude", "codex", "workbuddy")
+DEFAULT_PROCESSES = ("Claude.exe", "Codex.exe", "WorkBuddy.exe", "WorkBuddy AI.exe", "claude", "codex", "workbuddy", "workbuddy ai")
 _KEYS = frozenset({
     "core_projects", "exclude_patterns", "root_map", "instances",
     "include_desktop_fields", "allow_secret_hit_paths", "running_process_names",

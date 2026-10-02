@@ -509,3 +509,14 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 - undo 仅列 machine_restore 的未撤销记录；共用 select_operation 增加可选 operation_filter（默认旧行为不变），使用 plan_restore＋transaction，不调用旧 restore()。撤销前校验备份限定于 state/backups、数字文件名与已记录目标边界，拒绝链接／后续修改／运行程序；撤销写后核对字节，并以 machine_undo 记录避免重复撤销。新建文件删除，原文件逐字节恢复；目录可以保留为空，不声称删除整个工作目录。
 - `tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_verify_undo.py tests/test_ux_flows.py tests/test_machine_import_direction.py -q --basetemp tmp/run-mk35-36-20261002-c`：**54 passed，20.48 秒**。完整沙箱恢复含确认设置、信任、记忆、WorkBuddy；自动项一致，破坏规则文件 FAIL，撤销拒绝后续修改，修复后完整撤销，目标文件回到之前字节，再次检查状态与还原前一致；共用旧撤销接口回归通过。上一轮错误指定不存在的 tests/test_restore.py，0 项运行，随后改为现有接口回归文件。
 - 真实目标／净室撤销仍未运行，MK-36 保持部分完成；本次未读取真实助手目录。专家 verify／undo 接口已提供，真实 apply 仍需 G4。
+
+### MK-37 恢复向导与 P3 合并验证（2026-10-02）
+
+- 恢复向导复用 preflight／plan_restore／apply_restore／verify／undo。只在指定桌面、下载、启动目录／上级及可移动盘根的顶层查 ZIP，发现阶段仅读有界 manifest；选定后完整校验。可拖入路径、选择助手、补整体缺失的工作文件夹位置、等待关闭程序。安全设置／信任／WorkBuddy 文本默认跳过，各自明确选择后绑定刚显示的清单；向导不提供覆盖选项。总确认后写入，结果保留冲突路径、三份说明及人工后续事项；再次打开可撤销，失败日志不记录异常值／局部变量。
+- Windows 恢复入口 ASCII／CRLF，带引号的 %~1 转交路径；空参数让向导自动查找。Mac 恢复入口 LF／Git 100755，拖文件进窗口；quickstart 恢复节已补。新版备份摘要指向恢复入口，首份真实 ZIP 是旧生成时报告，原文件保持不变。真实跨机与新手试用仍未验收。
+- `tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_guided_restore.py tests/test_machine_guided_backup.py tests/test_launchers.py tests/test_start_bootstrap.py -q --basetemp tmp/run-mk37-20261002-b` → **25 passed，20.86 秒**。覆盖全程回车与专家文件字节等价、最终确认前 q 零变化、冲突另存、程序运行时等待、撤销回原字节、显示的信任清单变化拒绝、坏文件拒绝、顶层发现／拖入路径与禁用词扫描。
+- 专家 CLI 测试 `--basetemp tmp/run-mk37-cli-20261002-d`：**2 passed，3.30 秒**。合成 HOME 中只读检查／预览无写入，明确信任及 apply 后 verify 通过，再 undo；恶意 manifest 指向 auth.json 在目录白名单阶段拒绝，受保护目标零读取。初次该恶意夹具漏填 logical_path，修正用例参数后通过。
+- 合并：PowerShell 枚举 `tests/test_machine_*.py`，`tmp/venv-mk02-core/Scripts/python.exe -B -m pytest <文件列表> tests/test_launchers.py tests/test_start_bootstrap.py -q --basetemp tmp/run-p3-machine-20261002-a` → **91 passed，64.10 秒**。全部测试隔离 HOME／助手根环境变量；没有真实恢复或新双击备份。秘密扫描 0 findings，diff 检查、compileall、三个 .command 的 Git Bash 语法检查通过。
+- 净室准备清单已保存 `docs/machine-cleanroom-checklist.md`，未因此标记 MK-40 完成。MK-28 真机另需 G3＋G2，MK-40 的环境须 G8，MK-41 每次真实 apply 须 G4，信任须 G5，新手试用须 G9。没有运行真实工作区恢复、创建 Windows 用户／虚拟机、读取会话正文、推送新分支或实施可选 P7。
+
+- P3 交付前本地摘要自检：必填／唯一字段、未加引号日期、active 状态与 102 个稳定 evidence 路径通过，未使用外部日常同步工具。

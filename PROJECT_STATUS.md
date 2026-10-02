@@ -4,9 +4,9 @@ updated: 2026-10-02
 status: active
 overview: 当前转向离线换机迁移工具包，目标是备份并恢复 AI 助手配置、记忆和项目状态；旧桌面客户端及服务器同步方向已冻结。
 progress: >-
-  2026-10-02 完成换机任务入口与旧方向冻结标记；MK-01 经当次授权分四个主题提交并推送到私有 wip/machine-kit-baseline。MK-02 本机 Python 3.14 核心环境全量回归 349 passed／2 skipped；首次跨平台 CI 因缺 tmp 目录而未运行测试，修复待推送复测。P1 路径、分档、可选配置、zip 格式与夹具通过；MK-10 已授权只读路径核对在有登记键的转录目录上 8/8 一致，另有 7 个目录无对应键。P2 已实现批准范围的 Claude/Codex/WorkBuddy 采集、项目档案、软件与重装／登录报告及备份命令；WorkBuddy 保守分档经 G7 批准，恢复标为 manual。完整组包、向导和启动器隔离测试 66 passed；G3 真机备份生成 723584 B 的 zip，11 个核心项目、200 条、排除 3／提醒 0，源文件前后哈希／mtime 与包校验通过；负责人过目并确认 M1 范围。历史基线差异按当前快照记录；U 盘、恢复与真实加载仍未验收。旧 DT 仅保留历史。
+  2026-10-02 完成换机任务入口与旧方向冻结标记；MK-01 经当次授权分四个主题提交并推送到私有 wip/machine-kit-baseline。MK-02 本机 Python 3.14 核心环境全量回归 349 passed／2 skipped；首次跨平台 CI 因缺 tmp 目录而未运行测试，修复待推送复测。P1 路径、分档、可选配置、zip 格式与夹具通过；MK-10 已授权只读路径核对在有登记键的转录目录上 8/8 一致，另有 7 个目录无对应键。P2 已实现批准范围的 Claude/Codex/WorkBuddy 采集、项目档案、软件与重装／登录报告及备份命令；WorkBuddy 保守分档经 G7 批准，恢复标为 manual。备份、恢复、核验、撤销、两类向导与启动器合并隔离测试 91 passed；G3 真机备份生成 723584 B 的 zip，11 个核心项目、200 条、排除 3／提醒 0，源文件前后哈希／mtime 与包校验通过；负责人过目并确认 M1 范围。历史基线差异按当前快照记录；U 盘、恢复与真实加载仍未验收。旧 DT 仅保留历史。
 next: >-
-  按 MACHINE-MIGRATION-TASKS.md 推进已获 M1 确认的 P3 恢复阶段；MK-28 实现与 14 项测试通过，真实双击另需 G3＋G2，真实目标写入须单独 G4。修复后的 CI 待授权推送核验；Claude Desktop 登记目录为空与 WorkBuddy 加载机制仍待核实。每次真机写入按对应门禁执行，结果先写任务与验收记录。
+  P3 实现与沙箱验证已完成；按 MACHINE-MIGRATION-TASKS.md 等待负责人提供 G8 净室，再做 MK-41／42。MK-28 真实双击另需 G3＋G2，真实目标写入须单独 G4，信任须 G5，新手试用须 G9。修复后的 CI 待授权推送核验；Claude Desktop 登记目录为空与 WorkBuddy 加载机制仍待核实。每次真机写入按对应门禁执行，结果先写任务与验收记录。
 evidence:
   - MACHINE-MIGRATION-TASKS.md
   - sync_core/machine/paths.py
@@ -31,6 +31,12 @@ evidence:
   - tests/test_machine_backup.py
   - sync_core/machine/guided.py
   - sync_core/machine/guide_backup.py
+  - sync_core/machine/guide_restore.py
+  - tests/test_machine_guided_restore.py
+  - tests/test_machine_cli.py
+  - 恢复.cmd
+  - 恢复.command
+  - docs/machine-cleanroom-checklist.md
   - sync_core/machine/preflight.py
   - sync_core/machine/apply.py
   - tests/test_machine_apply.py
@@ -142,3 +148,5 @@ evidence:
 2026-10-02 MK-34：明确选择后的 WorkBuddy 候选文本落盘沙箱通过，受保护诱饵零读取／不变；真实加载继续未验证。
 
 2026-10-02 MK-35／36：自动文件／字段核验、破坏检出及完整撤销沙箱通过，共用接口相关 54 项回归通过。登录／真实加载为人工项；净室仍未提供。
+
+2026-10-02 P3：恢复向导与专家 CLI 等价验证完成，合并 91 项测试全部通过。当前等待 G8 净室进行真实演练；91 项自动测试不代表附录 B 签收、真实加载或零基础试用通过。净室准备清单仅记录准备步骤。未调用外部同步工具，未推送未授权分支。

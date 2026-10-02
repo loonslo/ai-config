@@ -53,7 +53,7 @@ def _log_failure(error: Exception, *, home: Path, env: Mapping[str, str]) -> Pat
         with target.open("x", encoding="utf-8") as handle:
             handle.write(text + "\n")
         return target
-    except (OSError, ValueError):
+    except (OSError, ValueError, RuntimeError):
         return None
 
 

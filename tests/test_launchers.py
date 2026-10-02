@@ -63,18 +63,20 @@ def test_launchers_exit_nonzero_with_an_actionable_message_when_unusable():
 
 
 def test_beginner_windows_launcher_ascii_crlf_and_safe_entry():
-    raw = (ROOT / '备份.cmd').read_bytes()
-    text = raw.decode('ascii')
-    assert b'\r\n' in raw and b'\n' not in raw.replace(b'\r\n', b'')
-    assert 'pause' in text.casefold()
-    assert 'ExecutionPolicy' not in text
-    assert '.ps1' not in text
-    assert 'scripts\\start.py' in text
-    assert text.index('py -3 -c') < text.index('python -c')
+    for name in ('备份.cmd','恢复.cmd'):
+        raw = (ROOT / name).read_bytes()
+        text = raw.decode('ascii')
+        assert b'\r\n' in raw and b'\n' not in raw.replace(b'\r\n', b'')
+        assert 'pause' in text.casefold()
+        assert 'ExecutionPolicy' not in text
+        assert '.ps1' not in text
+        assert 'scripts\\start.py' in text
+        assert text.index('py -3 -c') < text.index('python -c')
+    assert 'guide restore "%~1"' in (ROOT/'恢复.cmd').read_text(encoding='ascii')
 
 
 def test_beginner_mac_launchers_lf_and_executable_in_git():
-    for name in ('ai-config.command', '备份.command'):
+    for name in ('ai-config.command', '备份.command', '恢复.command'):
         assert b'\r' not in (ROOT / name).read_bytes()
         if not shutil.which('git') or not (ROOT / '.git').exists():
             pytest.skip('git checkout unavailable')

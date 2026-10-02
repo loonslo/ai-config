@@ -21,8 +21,9 @@ from sync_core.layout import default_state_path
 from sync_core.messages import Message
 
 
-def _failure(code: str, what: str, next_step: str, *, as_json: bool, exit_code: int = 1) -> int:
-    message = Message(code, what, "本机助手文件未被改写；已存在的备份保留。", next_step, exit_code=exit_code)
+def _failure(code: str, what: str, next_step: str, *, as_json: bool, exit_code: int = 1,
+             preserved: str = "本机助手文件未被改写；已存在的备份保留。") -> int:
+    message = Message(code, what, preserved, next_step, exit_code=exit_code)
     print(json.dumps(message.as_json(), ensure_ascii=False) if as_json else "\n".join(message.lines()), file=sys.stderr)
     return exit_code
 
@@ -67,7 +68,8 @@ def main(argv: list[str] | None = None) -> int:
     backup.add_argument("--apply", action="store_true")
     backup.add_argument("--json", action="store_true")
     guide = sub.add_parser("guide", help="beginner interactive guide")
-    guide.add_argument("operation", choices=("backup",))
+    guide.add_argument("operation", choices=("backup", "restore"))
+    guide.add_argument("bundle", nargs="?", type=lambda value: Path(value) if value else None)
     check = sub.add_parser("preflight", help="check a backup against this computer")
     check.add_argument("--bundle", type=Path, required=True)
     check.add_argument("--config", type=Path)
@@ -94,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--root-map", nargs="*", default=[])
     verify.add_argument("--agents")
     verify.add_argument("--json", action="store_true")
+    verify.add_argument("--out-dir", type=Path)
     verify.add_argument("--reinstall-done", action="store_true", help="record your completed reinstall checklist")
     undo = sub.add_parser("undo", help="preview or undo a machine restore")
     selection = undo.add_mutually_exclusive_group()
@@ -103,7 +106,12 @@ def main(argv: list[str] | None = None) -> int:
     undo.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     if args.command == "guide":
-        return guide_backup()
+        if args.operation == "backup":
+            if args.bundle is not None:
+                parser.error("guide backup does not accept a backup file")
+            return guide_backup()
+        from sync_core.machine.guide_restore import guide_restore
+        return guide_restore(args.bundle)
     if args.command == "undo":
         try:
             from sync_core.machine.undo import operations, undo as undo_machine
@@ -120,7 +128,8 @@ def main(argv: list[str] | None = None) -> int:
                   f"{'已撤销' if args.apply else '将撤销'} {report['writes']} 个文件；后续修改会受到保护。")
             return 0 if args.apply or not report['writes'] else 3
         except (OSError, ValueError, RuntimeError):
-            return _failure("E7412", "无法安全撤销这次恢复。", "核对文件是否有后续修改，并关闭助手后重试。", as_json=args.json)
+            return _failure("E7412", "无法安全撤销这次恢复。", "核对文件是否有后续修改，并关闭助手后重试。", as_json=args.json,
+                            preserved="原有备份保留；若写入已经开始，请核对恢复记录与目标文件。")
     if args.command in {"preflight", "restore", "verify"}:
         try:
             from sync_core.machine.bundle import validate_bundle
@@ -143,6 +152,11 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "verify":
                 from sync_core.machine.verify import verify as verify_machine
                 verification = verify_machine(result, software=software, reinstall_done=args.reinstall_done)
+                if args.out_dir is not None:
+                    output = validate_output(args.out_dir, roots=tuple(result.roots.values()),
+                                             projects=tuple(path for path in result.projects.values() if path is not None))
+                    with (output / "verify-report.md").open("x", encoding="utf-8") as handle:
+                        handle.write(verification.markdown())
                 print(json.dumps(verification.report(), ensure_ascii=False) if args.json else verification.markdown())
                 return verification.exit_code
             if args.command == "restore":
@@ -165,8 +179,9 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result.report(), ensure_ascii=False, sort_keys=True) if args.json else result.markdown())
             counts = result.report()["counts"]
             return 4 if result.running or counts.get("differs") or counts.get("blocked") or result.security_list or result.trust_list else 3 if counts.get("new") else 0
-        except (OSError, ValueError, KeyError, TypeError):
-            return _failure("E7410", "无法安全完成恢复前检查。", "核对备份文件、工作文件夹位置和助手安装情况后重试。", as_json=args.json)
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+            return _failure("E7410", "无法安全完成恢复前检查或恢复。", "核对备份文件、工作文件夹位置和助手安装情况后重试。", as_json=args.json,
+                            preserved="原有备份保留；若写入已经开始，请核对恢复记录与目标文件。" if args.command=="restore" else "本机助手文件未被改写；已有备份保留。")
     if args.command == "paths":
         try:
             report = check_claude_project_dirs(home=Path.home())
