@@ -90,8 +90,12 @@ if ($needsInstall) {
 }
 
 $syncScript = Join-Path $Root 'scripts\sync.py'
+if ($Arguments.Count -gt 0 -and $Arguments[0] -eq 'machine') {
+    $syncScript = Join-Path $Root 'scripts\machine.py'
+    $Arguments = @($Arguments | Select-Object -Skip 1)
+}
 if (-not (Test-Path -LiteralPath $syncScript)) {
-    Write-Host '[ai-config] 错误：找不到 scripts\sync.py，仓库可能不完整。' -ForegroundColor Red
+    Write-Host '[ai-config] 错误：找不到命令入口，仓库可能不完整。' -ForegroundColor Red
     Write-Host '  原有数据：没有文件被修改。'
     Write-Host '  下一步：重新获取完整的 ai-config 仓库后重试。'
     exit 2

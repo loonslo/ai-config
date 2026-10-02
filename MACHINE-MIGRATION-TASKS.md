@@ -338,19 +338,19 @@ python scripts/machine.py guide     restore [备份文件]
 | MK-02 | 恢复绿灯：依赖分层、2 个测试、秘密正则、CI | M | — | — | ◐（本机通过，CI 待验） |
 | **P1 规格与骨架** | | | | | |
 | MK-10 | 路径层 `paths.py` | S | MK-02 | — | ☑（已授权只读 self-check） |
-| MK-11 | 分档目录 `catalog.py` | S | MK-02 | — | ◐（数据模块完成，bundle 哨兵待采集器） |
+| MK-11 | 分档目录 `catalog.py` | S | MK-02 | — | ☑（批准范围与完整沙箱 bundle 哨兵通过） |
 | MK-12 | 配置文件 `machine.config.json` 与加载器 | S | MK-10 | — | ◐（加载器通过，11 项真机预览待验） |
 | MK-13 | bundle 格式 v1 与校验器 | M | MK-02 | — | ☑（本机格式验收；U 盘实测待后续） |
-| MK-14 | WorkBuddy 结构调研（只读） | M | MK-00 | **G7 批准 WorkBuddy 分档** | ☐ |
+| MK-14 | WorkBuddy 结构调研（只读） | M | MK-00 | **G7 批准 WorkBuddy 分档** | ☑（保守分档已批准，加载实验仍待后续） |
 | MK-15 | 测试夹具与静态守卫 | M | MK-13 | — | ☑ |
 | **P2 采集与备份** | | | | | |
 | MK-20 | 软件环境清单 | S | MK-13 | — | ◐（采集通过，报告集成待备份命令） |
 | MK-21 | ①档采集：规则、设置字段、记忆、Codex skills | M | MK-10,11,12,13,15 | — | ◐（沙箱及本机只读预览通过，整包验收待 MK-26） |
 | MK-22 | 项目档案采集（Claude/Codex） | L | MK-21 | **G2 读 `~/.claude.json`/sqlite** | ◐（沙箱与真机只读预览通过，整包待 MK-26） |
-| MK-23 | WorkBuddy 采集 | M | MK-14,13,15 | G7 | ☐ |
-| MK-24 | skills/插件/MCP 重装清单 | M | MK-21,22,23 | — | ☐ |
-| MK-25 | 登录与密钥清单 | S | MK-21,22,23 | — | ☐ |
-| MK-26 | `machine backup` 命令与启动器转发 | M | MK-20…25 | **G3 在真机运行** | ☐ |
+| MK-23 | WorkBuddy 采集 | M | MK-14,13,15 | G7 | ◐（保守沙箱及真机只读预览通过，整包待 MK-26） |
+| MK-24 | skills/插件/MCP 重装清单 | M | MK-21,22,23 | — | ◐（沙箱与本机只读预览通过，组包待 MK-26） |
+| MK-25 | 登录与密钥清单 | S | MK-21,22,23 | — | ◐（沙箱与本机只读预览通过，组包待 MK-26） |
+| MK-26 | `machine backup` 命令与启动器转发 | M | MK-20…25 | **G3 在真机运行** | ◐（组包／启动器沙箱通过，真机只读预览 200 条，apply 待 G3） |
 | MK-27 | 新手备份向导（问答骨架、`guide backup`） | M | MK-26 | — | ☐ |
 | MK-28 | 新手启动器与快速上手页（`start.py`、双击入口） | M | MK-27 | **G3 单独授权＋G2** | ☐ |
 | **P3 预检与还原** | | | | | |
@@ -775,14 +775,14 @@ python scripts/machine.py guide     restore [备份文件]
 
 登录凭据文件（Claude `.credentials.json`、Codex `auth.json` 等）、CC Switch 数据库与设置、会话数据库与转录（②档实验除外）、日志、缓存、用量统计、远程连接、`~/.claude/skills` 符号链接的内容、WorkBuddy 的 `keyblob`/`security/`/`app/`/`connectors*`/`user-state.json`/`local_storage`/`device-id`/`models.json`/`*.db*`/UUID 命名的账户目录/应用标记文件（`workspace-state.json`、`workspace-display-names.json`、`.*_migration.json`）。
 
-### A.WB WorkBuddy（**草案，待 MK-14 定稿并由负责人批准；定稿前采集器跳过**）
+### A.WB WorkBuddy（**2026-10-02 经负责人 G7 批准的保守分档**）
 
 | 类别 | 内容 |
 |---|---|
-| 整文件（auto） | `BOOTSTRAP.md`（若存在）、`IDENTITY.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`memory/**`、`skills/**`（文本，排除应用写入的迁移标记）；项目级 `<核心项目>/.workbuddy/{memory,skills}/**` 与 `.workbuddy-ai/…` |
-| 字段级（草案） | `settings.json`：`autoLaunchDesired`（auto）；`enabledPlugins`、`sandbox`（confirm，**内容待 MK-14 查明**） |
-| 不带 | `claw`（疑含用户信息）、`settings.json` 其余键、§A.4 所列 |
-| 备注 | **不新建 `AGENTS.md`**；两个实例各自独立（`workbuddy`、`workbuddy-ai`）；识别无官方依据，靠"按原路径还原其自身文件"和人工核验 |
+| 整文件（manual） | `BOOTSTRAP.md`（若存在）、`IDENTITY.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`memory/**/*.md`、自建 `skills/**` 文本（排除凭据命中、非文本、应用迁移标记及 VCS）；项目级 `<核心项目>/.workbuddy/{memory,skills}/**` 与 `.workbuddy-ai/…` 同理。自动加载未验证，本期只做手动还原候选。 |
+| 只记录 | `settings.json.enabledPlugins` 的插件名称进入重装清单；`autoLaunchDesired` 与 `sandbox` 当前只记录存在，暂不恢复。 |
+| 不带 | `claw`、`pluginConfigs`、`officeFileAssociationsRepairMarker`、`mcp-approvals.json`、账户 UUID 目录、未知 `scripts/`、`settings.json` 其余键及 §A.4 所列。 |
+| 备注 | **不新建 `AGENTS.md`**；两个实例各自独立（`workbuddy`、`workbuddy-ai`）。官方资料仅证明产品记忆与 `.codebuddy` 代码配置的部分加载，不证明 `.workbuddy` 文件何时加载；见 `docs/machine-migration-workbuddy.md`。 |
 
 ---
 
@@ -827,6 +827,7 @@ python scripts/machine.py guide     restore [备份文件]
 ## 11. 附录 D：未验证事项与已知风险（出现新情况请追加到这里）
 
 **未验证**：
+- 2026-10-02 MK-14 只读结构调研与 MK-23 保守采集：负责人本次会话批准 `manual` 的人设／记忆／文本技能分档，明确排除 `claw`、`sandbox` 和账户状态。真实机仅内存预览 76 条（人设 9、记忆 40、技能文本 27；项目级 38），疑似凭据排除 1、警告 0；读过的文件二次哈希／mtime 一致。没有写 zip，没有读凭据或数据库。`~/.workbuddy-ai/skills` 当前元数据共有 55 文件，含 VCS 与迁移标记，本期可纳入文本少于 55。具体结构与官方证据见 `docs/machine-migration-workbuddy.md`；真实加载与自动恢复仍未验证。
 - 2026-10-02 MK-22 经本次会话两次 G2 授权后只读预览：11 个核心文件夹均存在，归属于 8 个不同 Git 根；`.claude.json` 规范化项目 21 个、存在 12 个、已信任 16 个（旧基线为 10／15）；Codex sqlite 的项目根 12 个且均存在，线程 cwd 行 545。权限文件去重后 7 个、allow 规则 135 条，与基线一致；当前绝对路径规则 9 条（旧基线 6）。Claude Desktop 登记目录当前 0 个 JSON（旧基线 46），原因未核实。采集器在内存中生成 11 个项目画像和 27 个条目，未写 zip 或更改本机数据；整包验收仍待 MK-26。
 - 2026-10-02 MK-21 只读内存预览与 §4.3 基线不一致：规则 2 个、各 7,576 B，`duplicate_lines:41/111` 与基线一致；Claude 记忆当前可纳入 62 个、分布于 8 个 git 根目录，另有 1 个命中凭据检测而排除（基线为 61 个／7 目录）；Codex 自建 skills 仍为 4 个，但当前可纳入文本文件 25 个、非文本排除 1 个（基线称 75 文件／5 非文本）。未生成 zip、未读取信任文件或会话库、未输出内容。负责人本次会话已确认以当前快照继续核对；原基线保留为历史参照，整包验收仍待 MK-26。
 - Claude Desktop 的会话登记缺失时，列表能否恢复（MK-42b）。

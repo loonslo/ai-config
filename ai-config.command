@@ -71,8 +71,12 @@ if [ "$NEEDS_INSTALL" -eq 1 ]; then
 fi
 
 SYNC_SCRIPT="$ROOT/scripts/sync.py"
+if [ "${1:-}" = "machine" ]; then
+    SYNC_SCRIPT="$ROOT/scripts/machine.py"
+    shift
+fi
 if [ ! -f "$SYNC_SCRIPT" ]; then
-    fail "找不到 scripts/sync.py，仓库可能不完整。" "重新获取完整的 ai-config 仓库后重试。"
+    fail "找不到命令入口，仓库可能不完整。" "重新获取完整的 ai-config 仓库后重试。"
 fi
 
 exec "$VENV_PYTHON" "$SYNC_SCRIPT" "$@"

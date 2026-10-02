@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from contextlib import closing
 import json
+import hashlib
 import os
 from pathlib import Path
 import platform
@@ -16,7 +17,7 @@ from sync_core.utils import SECRET
 
 from .bundle import BundleWriter
 from .catalog import allowed_item
-from .collect_tier1 import _read, project_id
+from .collect_tier1 import CollectionResult, _read, project_id
 from .config import MachineConfig
 from .paths import derive_project_dir, git_root, norm
 
@@ -26,7 +27,7 @@ _SKIP = frozenset({".git", "node_modules", "worktrees"})
 
 
 @dataclass
-class ProjectResult:
+class ProjectResult(CollectionResult):
     projects: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[dict[str, str]] = field(default_factory=list)
     dead_registered: int = 0
@@ -82,7 +83,8 @@ def _codex_registry(home: Path, environ: Mapping[str, str]) -> dict[str, str]:
             return {}
         return {path: fields["trust_level"] for path, fields in registered.items()
                 if isinstance(path, str) and Path(path).is_absolute() and isinstance(fields, dict)
-                and isinstance(fields.get("trust_level"), str)}
+                and isinstance(fields.get("trust_level"), str)
+                and fields["trust_level"] in {"trusted", "untrusted"}}
     except (OSError, ValueError, UnicodeError):
         return {}
 
@@ -121,23 +123,24 @@ def _desktop_cwds(home: Path, environ: Mapping[str, str]) -> list[str]:
     return values
 
 
-def _registered(home: Path, environ: Mapping[str, str]) -> tuple[dict[str, dict[str, bool]], dict[str, str], list[str], list[str], list[str], bool]:
-    claude = _claude_registry(home)
-    codex = _codex_registry(home, environ)
-    roots, threads, sqlite_ok = _sqlite_paths(home, environ)
-    desktop = _desktop_cwds(home, environ)
+def _registered(home: Path, environ: Mapping[str, str], agents: frozenset[str]) -> tuple[dict[str, dict[str, bool]], dict[str, str], list[str], list[str], list[str], bool]:
+    claude = _claude_registry(home) if "claude" in agents else {}
+    codex = _codex_registry(home, environ) if "codex" in agents else {}
+    roots, threads, sqlite_ok = _sqlite_paths(home, environ) if "codex" in agents else ([], [], True)
+    desktop = _desktop_cwds(home, environ) if "claude" in agents else []
     return claude, codex, roots, threads, desktop, sqlite_ok
 
 
 def known_folders(*, home: Path, environ: Mapping[str, str] | None = None,
-                  os_name: str | None = None) -> list[str]:
+                  os_name: str | None = None,
+                  agents: frozenset[str] = frozenset({"claude", "codex"})) -> list[str]:
     """Return only normalized folder names from the approved registries."""
     env = os.environ if environ is None else environ
     system = os_name or platform.system().lower()
-    claude = _claude_registry(home)
-    codex = _codex_registry(home, env)
-    roots, _, _ = _sqlite_paths(home, env, threads=False)
-    desktop = _desktop_cwds(home, env)
+    claude = _claude_registry(home) if "claude" in agents else {}
+    codex = _codex_registry(home, env) if "codex" in agents else {}
+    roots, _, _ = _sqlite_paths(home, env, threads=False) if "codex" in agents else ([], [], True)
+    desktop = _desktop_cwds(home, env) if "claude" in agents else []
     found: dict[str, str] = {}
     for path in (*claude, *codex, *roots, *desktop):
         if isinstance(path, str) and Path(path).is_absolute():
@@ -169,11 +172,12 @@ def _local_settings(root: Path) -> list[Path]:
 
 
 def collect_projects(writer: BundleWriter, *, home: Path, config: MachineConfig,
-                     environ: Mapping[str, str] | None = None, os_name: str | None = None) -> ProjectResult:
+                     environ: Mapping[str, str] | None = None, os_name: str | None = None,
+                     agents: frozenset[str] = frozenset({"claude", "codex"})) -> ProjectResult:
     env = os.environ if environ is None else environ
     system = os_name or platform.system().lower()
     result = ProjectResult()
-    claude, codex, roots, threads, desktop, sqlite_ok = _registered(home, env)
+    claude, codex, roots, threads, desktop, sqlite_ok = _registered(home, env, agents)
     if (Path(env.get("CODEX_HOME", str(home / ".codex"))) / "state_5.sqlite").exists() and not sqlite_ok:
         result.warnings.append({"code": "E7201", "message": "Codex 项目数据库无法只读打开或缺少所需表"})
     registered = (*claude, *codex, *roots)
@@ -213,12 +217,12 @@ def collect_projects(writer: BundleWriter, *, home: Path, config: MachineConfig,
             "permissions_local_files": 0, "permissions_allow_rules": 0, "permissions_absolute_rules": 0,
         }
         encoded = derive_project_dir(str(project))
-        if encoded is not None:
+        if "claude" in agents and encoded is not None:
             session_dir = Path(env.get("CLAUDE_CONFIG_DIR", str(home / ".claude"))) / "projects" / encoded
             if session_dir.is_dir() and not session_dir.is_symlink():
                 record["claude_session_count"] = sum(source.is_file() and not source.is_symlink()
                                                      for source in session_dir.glob("*.jsonl"))
-        if record["exists"]:
+        if "claude" in agents and record["exists"]:
             for source in _local_settings(project):
                 if _owner(str(source), config.core_projects, system) != identity:
                     continue
@@ -227,11 +231,13 @@ def collect_projects(writer: BundleWriter, *, home: Path, config: MachineConfig,
                     break
                 try:
                     data = _read(source, project)
+                    result.source_fingerprints[source] = (hashlib.sha256(data).hexdigest(), source.stat().st_mtime_ns, project)
                     parsed = json.loads(data)
                 except (OSError, ValueError, UnicodeError):
                     result.warnings.append({"code": "E7202", "message": "一个项目本地权限文件无法安全读取"})
                     continue
                 if SECRET.search(data.decode("utf-8", errors="replace")):
+                    result.exclusions.append({"logical_path": f"project:{pid}/{relative}", "reason": "secret_hit"})
                     result.warnings.append({"code": "E7203", "message": "一个项目本地权限文件命中凭据特征，已跳过"})
                     continue
                 permissions = parsed.get("permissions", {}) if isinstance(parsed, dict) else {}
@@ -255,7 +261,7 @@ def collect_projects(writer: BundleWriter, *, home: Path, config: MachineConfig,
                             agent="claude", instance="main", kind="trust_fields", tier=2, mode="fields",
                             logical_path=f"project:{pid}/claude/trust", restore="manual", project_id=pid,
                             fields=list(trust))
-        if codex_trust is not None:
+        if codex_trust is not None and record["exists"]:
             writer.add_file(f"files/projects/{pid}/codex/trust.fields.json",
                             (json.dumps({"trust_level": codex_trust}, sort_keys=True) + "\n").encode(),
                             agent="codex", instance="main", kind="trust_fields", mode="fields",
