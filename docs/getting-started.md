@@ -2,6 +2,25 @@
 
 本文对应 README 的四步流程，解释每一步在做什么，以及为什么这样设计。只做配置同步的话，读完这一页就够了。
 
+## 桌面设置：复制后原内容和加载状态
+
+设置页的“确认并保存本机设置”登记目录并准备规则库，不改写 Agent 原文件。只把内容复制到规则库，Agent 不会因此自动读取；还需要单独预览并应用到实际使用的规则入口。
+
+应用规则时，共享文件只更新 `ai-config` 受管区块，区块外原文保留。独立规则文件遇到已有非受管内容会阻止覆盖。共享设置会更新选中的受管字段，其他字段保留。写入前保存事务备份；“历史与恢复”可预览撤销。目标有后续修改时撤销会停止，避免覆盖新内容。
+
+“设备迁移”里的“采纳到配置库”会将对应段落按原文和来源迁入配置库，并从原文件移除；“移除”也会改变原文件，两者都先备份。希望原段落留在原处，选择“保留”；“暂不处理”不会迁入。
+
+| Agent | 当前适配器写入入口（相对所选配置目录） | 识别边界 |
+| --- | --- | --- |
+| Codex | `AGENTS.md` | 官方入口；存在 `AGENTS.override.md` 时优先读取后者 |
+| Claude Code | `CLAUDE.md` | 官方用户规则入口；配置库中的模板名称不等于目标入口 |
+| CodeBuddy Code（CLI） | `rules/ai-config.md` | 官方用户规则目录；IDE 需单独核验 |
+| WorkBuddy / workbuddy-ai | `AGENTS.md` | 当前适配器候选入口，真实会话自动识别尚未验收 |
+
+2026-10-01 核对官方入口：[Codex](https://learn.chatgpt.com/docs/agent-configuration/agents-md)、[Claude Code](https://code.claude.com/docs/en/memory)、[CodeBuddy Code](https://www.codebuddy.ai/docs/cli/memory)。实际目录必须对应 Agent 正在使用的实例；检测到目录、文件写入成功都不等于加载成功。
+
+应用规则后，在本页“加载核验”获取问题，在目标 Agent 的**新会话**询问“ai-config 规则版本是多少？只回答版本号。”，再回客户端记录回答。核验当前版本不能证明模型在每个任务中都严格遵守所有规则。
+
 ## 0. 一套配置是怎样走到另一台设备的
 
 ```text
@@ -32,7 +51,7 @@
 
 - 当前系统（windows / macos）
 - Python 版本和是否满足 3.11+
-- Git 是否可用
+- 本机离线设置是否可用；Git 是否可用（只有克隆或发布 Git 远端时才需要）
 - Codex / Claude 目录在哪，来自环境变量（`CODEX_HOME` / `CLAUDE_CONFIG_DIR`）还是默认位置
 
 检测**不会创建**任何工具目录。没装某个工具就如实报告，不会替你造一个空的配置目录出来。
@@ -43,7 +62,15 @@
 .\ai-config.ps1 setup --apply
 ```
 
-它会生成 `device.json`（已被 Git 忽略，不会提交）：
+它会在 `~/.ai-sync/` 用户数据目录中生成设备配置、独立配置库和本机状态目录。离线配置库不依赖 Git：
+
+```text
+~/.ai-sync/device.json    本机设备目录与身份
+~/.ai-sync/store/         本机共享规则与已支持的共享设置
+~/.ai-sync/state/         本机基线、事务和恢复资料
+```
+
+如果要接入已有 Git 远端，通过 `--remote <地址>` 克隆；该操作才要求 Git。
 
 | 字段 | 含义 |
 | --- | --- |
@@ -63,9 +90,16 @@
 
 未勾选的字段完全不受影响。工具的 MCP、提供商、Windows 沙箱等设置保持本机值。
 
-## 2. 加入第二台设备
+## 2. 用已有 Git 配置源加入另一台设备
 
-在第二台机器上克隆同一个配置源，运行同样的 `setup --apply`。
+本机离线配置库只保存在这台设备。旧命令行方式需要已存在的 Git 配置源。使用相同地址在每台设备运行：
+
+```text
+.\ai-config.ps1 setup --remote <已有配置源地址> --apply
+./ai-config.command setup --remote <已有配置源地址> --apply
+```
+
+命令会将配置源克隆到本机 `~/.ai-sync/store`；若目录中已有与之不同的配置，操作会停止，需先由用户处理。新的桌面客户端服务器同步与离线迁移包尚未实现。
 
 - 设备 ID 自动生成，与已有设备冲突时会**明确停止**，不会覆盖已有设备记录。
 - 网络或认证失败时已填写的信息会保留，可以直接重试。
@@ -144,7 +178,35 @@
 | 应用失败 | 目标缺失、格式错误或无法读取 | 查看 `doctor` 输出 |
 | 需要重启 | 已应用但工具尚未加载 | 重开工具 |
 
+每个规则入口后面还会显示**规则版本**和**加载核验**（未核验 / 已核验 / 已过期 / 未通过）；已登记但暂时找不到规则入口的 agent 会单独列出，并注明原因（E1003）。
+
+## 5. 接管更多 agent（可选）
+
+除了 Codex 和 Claude Code，ai-config 还能接管 CodeBuddy、WorkBuddy（包括第二个实例 `~/.workbuddy-ai`）、TRAE，以及任何读取 Markdown 规则文件的 agent。顺序固定为五步，每一步默认都只预览：
+
+1. **看清现状**：`scan` 只读列出本机的 agent、它们的规则入口、你手写的规则里有多少已在配置库、skills 分布，以及凭据等受保护文件（只列名称，从不打开）。
+2. **迁入**：`migrate` 把各 agent 里已有的规则按章节列出。完全重复的章节默认移除（先备份）；有独有内容的章节逐项用 `--item <序号> --choice adopt|keep|remove|skip` 决定。`adopt` 会把独有行原样、带来源写进配置库的 `common/imported.md`，之后所有 agent 都会收到。
+3. **应用**：`sync --apply` 把配置库写进每个已登记 agent 的规则入口，写前备份，写后核验。
+4. **核验加载**：`verify-load --agent <标识>` 告诉你在该 agent 的新会话里问什么；把回答传给 `--answer`，加 `--apply` 记录结果。
+5. **需要时退出**：`detach --agent <标识>` 只移除 ai-config 写入的内容；加 `--restore-original` 还能放回迁入前的原件。
+
+不在内置名单里的 agent，用 `declare` 登记：
+
+```text
+.\ai-config.ps1 declare --agent kiro --root C:\Users\me\.kiro --entry steering/ai-config.md --apply
+```
+
+想把规则放在一个独立的配置库里（不和工具代码放在一起），首次设置时加 `--store`（默认 `~/.ai-sync/store`；配合 `--remote` 则是克隆已有配置库）：
+
+```text
+.\ai-config.ps1 setup --store --apply
+```
+
 ## 下一步
 
 - 遇到报错 → [遇到问题](troubleshooting.md)
 - 想了解内部结构和兼容入口 → [高级说明](advanced.md)
+
+## 桌面预览入口（2026-10-01）
+
+新的正常用户流程见 [客户端入门](../README.md)：首次设置、迁入、编辑与应用、离线包、服务器登录/解锁、状态和历史恢复均有客户端入口。以下旧命令保留为兼容说明，不要求桌面用户打开终端。真实安装、Mac 和服务器边界见 [实施记录](desktop-local-implementation.md)。

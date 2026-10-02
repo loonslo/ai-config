@@ -1,0 +1,39 @@
+{
+  "adapters": [
+    {
+      "id": "codex_rules",
+      "version": 1
+    }
+  ],
+  "content_id": "373c30199811f7d4b691e02edf8724ac8cfc0ef982c2131135b7a24b06b4f62e",
+  "created_at": "2026-10-01T00:00:00Z",
+  "dependencies": [],
+  "entries": [
+    {
+      "adapter_id": "codex_rules",
+      "adapter_version": 1,
+      "data_type": "rule_file",
+      "logical_source": "agent://codex/main/AGENTS.md",
+      "object_path": "objects/8ad9561bad94cb2480b738769f721aed0fc9b6ac0300d34816bd9628f53a853e.bin"
+    }
+  ],
+  "exclusions": [],
+  "objects": [
+    {
+      "path": "objects/8ad9561bad94cb2480b738769f721aed0fc9b6ac0300d34816bd9628f53a853e.bin",
+      "sha256": "8ad9561bad94cb2480b738769f721aed0fc9b6ac0300d34816bd9628f53a853e",
+      "size": 27
+    }
+  ],
+  "package_id": "0123456789abcdef0123456789abcdef",
+  "parent_content_id": null,
+  "schema_version": 2,
+  "scope": {
+    "agent_ids": [
+      "codex"
+    ],
+    "data_types": [
+      "rule_file"
+    ]
+  }
+}
