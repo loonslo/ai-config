@@ -410,5 +410,33 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 - 在独立 HOME、USERPROFILE、CODEX_HOME、CLAUDE_CONFIG_DIR、AI_CONFIG_HOME 下运行 `tmp/venv-mk02-core/Scripts/python.exe -m pytest -q --basetemp tmp/run-mk02-core-20261002-c`：**349 passed，2 skipped，164.14 秒**。跳过冻结范围的依赖测试，不代表冻结范围已验收。
 - `.venv/Scripts/python.exe -m pytest -q tests/test_secret_patterns.py tests/test_onboarding.py --basetemp tmp/run-mk02-secrets-20261002-b`：16 passed；此前 MK-02 相关定向测试 6 passed。
 - `python scripts/check-secrets.py`：**0 findings**；`git diff --check`：exit 0（仅换行提示）。
+- MK-01：负责人在本次会话明确授权向私有 `origin` 的 `wip/` 分支推送；`gh repo view loonslo/ai-config --json isPrivate,visibility,nameWithOwner` 返回 `isPrivate=true`。按核心／冻结代码／文档／测试分为四个本地提交（`6b004af`、`0d3b421`、`089be70`、`febc522`），先运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-secrets.ps1`，结果 0 findings；`git push -u origin wip/machine-kit-baseline` 成功。`git rev-list --count origin/wip/machine-kit-baseline..HEAD` 为 0，推送后工作树干净，后续开发切到 `feat/machine-kit`。未推送 main，未用 `--force`。
 
-未验证：GitHub Actions 的 Windows/macOS `core` job 尚未运行；`frozen` job 未在隔离环境执行；MK-02 的 CI 验收仍待推送后核对。未读取真实 Agent 状态文件、未运行备份／恢复、未进行跨机或新手试用。本节的测试只说明本机代码范围，不代表整个迁移工具包完成。
+此时未验证：GitHub Actions 的 Windows/macOS `core` 与 `frozen` job；下节记录随后首次 CI 运行结果。未读取真实 Agent 状态文件、未运行备份／恢复、未进行跨机或新手试用。本节的测试只说明本机代码范围，不代表整个迁移工具包完成。
+
+### P1 路径、分档、配置、包格式与夹具（2026-10-02）
+
+架构边界：`sync_core/machine/` 独立于已冻结的 `sync_core/package`、`cloud`、`application`；路径层只归一和映射，目录层按批准项放行，配置缺失采用安全默认，包层只写新的 zip 格式并对所有成员有界校验。WorkBuddy 条目保持 `draft`，默认不采集。目标真机目录和私有状态尚未读取。
+
+- 新增 `paths.py` 的 Windows／Mac 规范化、Git 主检出根、最长前缀根映射与真实大小写；`catalog.py` 的默认拒绝目录；`config.py` 的可选本地配置和占位示例；`bundle.py` 的内容标识、原样字节、`.partial` 写入、有限读取与压缩包完整性校验；`tests/_machine_fixtures.py` 与静态导入守卫。
+- 在隔离 HOME 和全新 `--basetemp tmp/run-mk15-20261002-b` 中执行 `tmp/venv-mk02-core/Scripts/python.exe -m pytest -q tests/test_machine_paths.py tests/test_machine_catalog_config.py tests/test_machine_bundle.py tests/test_machine_import_direction.py tests/test_machine_fixtures.py`：**37 passed，1.17 秒**。覆盖 zip 成员路径、大小写／NFC 重名、符号链接、压缩方式、大小与压缩比上限、JSON 重复键／非有限数／未知版本、清单不符、损坏中央目录、无覆盖发布、稳定内容标识和中文往返。
+- `MK-10` 的真实 Claude 路径 self-check 需单独只读授权；`MK-11` 的整包哨兵验收依赖后续采集器；`MK-12` 的 11 个核心项目真机只读预览未运行。`MK-13` 的 FAT/exFAT U 盘行为尚未实测；本轮只完成本地包格式验收。
+- 首次推送的 GitHub Actions run `36963621887` 失败：macOS 核心与冻结 job 在 pytest 创建 `tmp/ci-*` 前发现干净 runner 缺 `tmp/`，350 项均为 setup 错误，测试用例没有实际运行；Windows job 被取消。已在 CI 配置的两个 job 中加入创建 `tmp/` 步骤，尚未推送或复测，MK-02 CI 门槛继续未通过。
+
+### P2 软件与①档采集的只读预览（2026-10-02）
+
+- MK-20：软件清单函数仅运行本机已安装程序的版本查询、全局 npm 包名／版本查询，不联网；进程调用可注入、单个命令最多 10 秒，符号链接能力只在系统临时目录试建并清理。测试 `tests/test_machine_collect_records.py` 在隔离 HOME、`--basetemp tmp/run-mk20-20261002-b` 下 1 passed。本机读取得到 Windows AMD64、Node 22.22.3、npm 12.0.2、Git 2.54.0、uv 0.12.10、pnpm 10.29.3、cargo/rustc 1.98.1、winget 1.29.380；6 个 npm 全局包名，Claude Desktop 内置 Claude Code 版本目录 2.1.284／2.1.286。Codex Desktop 与 CC Switch 版本获取方式仍未核实，记 `null`。`reports/software.json` 要到 MK-26 组包时生成。
+- MK-21：`collect_tier1()` 只读 Claude/Codex 的批准项；设置只派生白名单字段，WorkBuddy 草案与 Claude 信任文件、Codex 会话库均不读取。沙箱生成 zip 后验证哨兵零出现、受保护文件零读取、源目录零变化、`content_id` 稳定和按助手过滤。`tests/test_machine_collect_tier1.py` 在隔离 HOME、`--basetemp tmp/run-mk21-20261002-e` 下 **4 passed，2.03 秒**。
+- 本机只在内存中预览，没有写 zip：91 个条目，其中规则 2、设置字段 2、Claude 记忆 62、Codex 技能文本 25；93 个已读源文件的哈希和修改时间在二次读取后全部一致；排除疑似凭据的记忆 1 个、非文本技能 1 个，警告 0。规则两份各 7,576 B，重复统计均为 41/111。内存预览没有读取 `~/.claude.json` 或 Codex sqlite，也没有输出人设／记忆／令牌内容。
+- 这与 2026-10-01/02 的旧基线 61 个记忆／7 目录、5 个非文本技能不同。负责人本次会话确认以当前快照继续核对；原数值保留为历史参照。整包报告、正式备份及跨机还原仍未验收。
+- MK-10 单独获得本次会话 G2 只读授权后运行 `tmp/venv-mk02-core/Scripts/python.exe scripts/machine.py paths --self-check`：29 个 Claude 项目路径键；15 个含转录的目录中有 8 个与登记路径编码匹配、7 个无对应登记键，长路径不支持项 0。对**登记路径且存在转录目录**的 8 个样本，推导一致率 8/8；其余 7 个目录可能来自不同工作目录，未逐个核对、也未读取转录内容。此结果不代表所有转录目录均由信任登记键覆盖。
+- 增加源文件二次哈希／mtime 检查与密钥命中／符号链接沙箱用例后，统一运行 `tmp/venv-mk02-core/Scripts/python.exe -m pytest -q <tests/test_machine_*.py 的文件列表> --basetemp tmp/run-mk21-20261002-g`：**43 passed，4.33 秒**。此前一次直接把通配符传给 Windows 版 pytest 的调用未展开文件名，0 项运行；本次改为 PowerShell 枚举测试文件后通过。`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-secrets.ps1` 为 0 findings，`git diff --check` 与 Python 编译检查通过。
+
+### P2 项目档案采集与真机只读预览（2026-10-02）
+
+- MK-22 新增 `collect_projects.py`：核心文件夹与 Git 根分别标识，同一个 Git 根下的核心文件夹仍保留独立档案；Claude 信任只提取两个布尔字段并按规范化路径合并，Codex 只取核心项目的 `trust_level`，SQLite 通过 `mode=ro` 仅读 `project_roots.path` 和 `threads.cwd`。项目本地权限文件限深度 2，按最长核心路径归属并去重；会话只统计文件名／cwd，不读转录正文；`known_folders()` 仅返回规范化路径。派生报告为 `reports/projects.json`，信任字段与权限原文件可进入新 bundle；命中凭据特征的权限文件会跳过。
+- 合成 HOME 的 `tests/test_machine_collect_projects.py` 在全新 `--basetemp tmp/run-mk22-20261002-g` 下 **4 passed，3.29 秒**；覆盖凭据哨兵不进包、受保护诱饵不被打开、源目录不变、数据库缺失、共享 Git 根仍保留两个项目档案。全部 machine 定向测试此前为 46 passed；新增第 4 项后待合并复测。
+- 负责人本次会话先授权 MK-22 对 `~/.claude.json` 两个信任字段、Codex `config.toml` 核心信任字段与 sqlite 路径／cwd 计数的只读核对，随后又授权项目本地权限文件与 Claude Desktop cwd 登记、转录目录文件名计数；未授权真实备份写入或远程推送。预览只在内存建立 `BundleWriter`，没有 `finalize()`、没有 zip 输出。首次预览重复统计了共享 Git 根下的文件，修正最长核心路径归属后再运行。
+- 修正后：11 个核心文件夹均存在，对应 8 个不同 Git 根；`~/.claude.json` 规范化项目 21 个，其中 12 个存在、16 个已信任；Codex sqlite 项目根 12 个且均存在，线程 cwd 行 545；Codex 核心信任在 11 个档案均有记录。权限文件 7 个、allow 规则 135 条、当前绝对路径规则 9 条。内存中 11 个项目档案与 27 个条目，警告 0。Claude Desktop `claude-code-sessions` 目录当前有 0 个 JSON；旧基线 46 个，原因未核实。Claude 项目转录文件按核心目录计数总计 41，线程 cwd 落在核心目录内 426；这些是当前计数，不代表会话可迁移。
+- 与 §4.3 的历史基线差异按负责人先前确认的当前快照记录，不覆盖旧基线。实际 bundle 组装、`reports/projects.json` 写入 zip、真实文件哈希／mtime 全量复核与跨机还原待 MK-26 及后续任务。
+- 汇总复测：PowerShell 枚举 `tests/test_machine_*.py` 后，`py -3.14 -B -m pytest <文件列表> -q --basetemp tmp/run-mk22-20261002-h` 为 **47 passed，4.92 秒**；`scripts/check-secrets.ps1` 为 0 findings，`git diff --check` 与 `compileall` 通过。项目内摘要契约自检：必填字段、唯一字段、日期／状态和 62 个现存稳定 evidence 路径均通过；未运行外部日常库同步工具。

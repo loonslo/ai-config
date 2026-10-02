@@ -4,11 +4,22 @@ updated: 2026-10-02
 status: active
 overview: 当前转向离线换机迁移工具包，目标是备份并恢复 AI 助手配置、记忆和项目状态；旧桌面客户端及服务器同步方向已冻结。
 progress: >-
-  2026-10-02 完成换机任务入口与旧方向冻结标记，实施 MK-02 本机依赖分层、隔离 HOME、过期断言和秘密检测修复。Python 3.14 核心环境全量回归 349 passed／2 skipped，秘密扫描 0 命中；CI Windows／macOS 尚未验证，MK-02 不据此宣称全部验收。旧 DT 实现、预览安装包及此前验收仅保留为历史，原生安装、真实 Agent 加载、跨机、服务器与新手试用仍未验收。迁移采集、备份和恢复尚未实现。
+  2026-10-02 完成换机任务入口与旧方向冻结标记；MK-01 经当次授权分四个主题提交并推送到私有 wip/machine-kit-baseline。MK-02 本机 Python 3.14 核心环境全量回归 349 passed／2 skipped、秘密扫描 0 命中；首次跨平台 CI 因缺 tmp 目录而未运行测试，修复待推送复测。P1 路径、分档、可选配置、新 zip 格式及夹具已实现；经单独授权的 MK-10 路径核对在有登记键的转录目录上 8/8 一致，另有 7 个转录目录未对应登记键。P2 软件清单与①档采集器已在沙箱验证，本机内存预览得到 91 条，93 个已读源文件二次核对哈希／mtime 不变；与旧基线差异经负责人确认使用当前快照继续核对。MK-22 合成测试 4 passed；经单独授权的真机只读预览为 11 个核心项目、7 个权限文件／135 条规则，Claude Desktop 登记目录现无 JSON。整包备份及 U 盘未验收。旧 DT 仅保留历史；恢复尚未实现。
 next: >-
-  按 MACHINE-MIGRATION-TASKS.md 推进 MK-01 私有 wip 分支保存现状、MK-02 CI 核验及 P1 路径／分档／配置／包格式；后续采集、恢复和真机步骤按各自门禁执行，并把结果先写入任务与验收记录。
+  按 MACHINE-MIGRATION-TASKS.md 在 feat/machine-kit 完成 P2 重装／登录清单和组包命令；修复后的 CI 待授权推送核验。MK-22 的旧基线差异、Desktop 登记目录为空待核实。真机备份写入、恢复与 WorkBuddy 分档按各自门禁执行，结果先写任务与验收记录。
 evidence:
   - MACHINE-MIGRATION-TASKS.md
+  - sync_core/machine/paths.py
+  - sync_core/machine/catalog.py
+  - sync_core/machine/config.py
+  - sync_core/machine/bundle.py
+  - tests/test_machine_bundle.py
+  - tests/test_machine_import_direction.py
+  - sync_core/machine/collect_records.py
+  - sync_core/machine/collect_tier1.py
+  - tests/test_machine_collect_tier1.py
+  - sync_core/machine/collect_projects.py
+  - tests/test_machine_collect_projects.py
   - DESKTOP-TASKS.md
   - docs/desktop-local-implementation.md
   - docs/acceptance.md
@@ -64,6 +75,10 @@ evidence:
 # AI 配置同步 · 项目概览与进度
 
 2026-10-02 方向调整：旧桌面客户端、服务器／云同步和受管区块同步冻结；本轮开始实施 `MACHINE-MIGRATION-TASKS.md`。MK-00 文档入口及状态同步已完成；MK-02 本机核心环境全量测试和秘密扫描通过，GitHub Actions 跨平台 CI 尚未验证。原进展记录日期为 2026-10-01，以下历史段落没有重新验收，具体本轮命令与范围见 `docs/acceptance.md`。本次未使用外部日常库同步工具。
+
+同日继续实施 P1：路径、分档、配置、包格式与隔离夹具的 37 项定向测试通过；MK-10/11/12 的真机或整包验收尚未完成。首次跨平台 CI 因缺 `tmp/` 导致 pytest setup 失败，已本地修正，尚待新的 CI 运行验证；这不算 MK-02 通过。结果和边界见 `docs/acceptance.md`。
+
+同日 P2 更新：MK-22 项目档案在合成 HOME 验证，并在本次单独 G2 授权下完成真机只读内存预览；11 个核心文件夹与 7 个本地权限文件均被识别，Claude Desktop 会话登记目录当前为空。详细计数、旧基线差异及未验证边界见 `docs/acceptance.md`。尚未生成真实备份包或运行恢复。
 
 2026-10-01 维护：本轮仅推进不依赖用户外部环境的实现，集中自测只选核心功能。历史 DT 测试保留在原验收记录中，不计为本轮复测。Windows 构建和隔离核心验证不能代替原生窗口、跨设备或真实部署；未执行项继续保持待验收。
 
