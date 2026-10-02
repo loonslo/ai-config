@@ -13,12 +13,12 @@ import sqlite3
 import tomllib
 from typing import Any, Mapping
 
-from sync_core.utils import SECRET
+from .privacy import private_text
 
 from .bundle import BundleWriter
 from .catalog import allowed_item
 from .collect_tier1 import CollectionResult, _read, project_id
-from .config import MachineConfig
+from .config import MachineConfig,excluded_path
 from .paths import derive_project_dir, git_root, norm
 
 
@@ -148,16 +148,16 @@ def known_folders(*, home: Path, environ: Mapping[str, str] | None = None,
     return sorted(found.values(), key=str.casefold)
 
 
-def _local_settings(root: Path) -> list[Path]:
+def _local_settings(root: Path, *, excluded=lambda path: False) -> list[Path]:
     """Inspect only root, child and grandchild project folders."""
     result: list[Path] = []
     pending = [(root, 0)]
     while pending:
         current, depth = pending.pop()
-        if current.is_symlink():
+        if current.is_symlink() or excluded(current):
             continue
         candidate = current / ".claude" / "settings.local.json"
-        if candidate.is_file() and not candidate.is_symlink():
+        if candidate.is_file() and not candidate.is_symlink() and not excluded(candidate):
             result.append(candidate)
         if depth == 2:
             continue
@@ -189,8 +189,15 @@ def collect_projects(writer: BundleWriter, *, home: Path, config: MachineConfig,
             found.setdefault(_key(path, system), norm(path, system))
     result.known_paths = sorted(found.values(), key=str.casefold)
     seen: set[str] = set()
+    def excluded(path: Path) -> bool:
+        if not excluded_path(path,config=config,home=home,os_name=system):
+            return False
+        result.exclusions.append({'logical_path':norm(path,system),'source_path':str(path),'reason':'excluded_by_config'})
+        return True
     for configured in config.core_projects:
         project = Path(configured)
+        if excluded(project):
+            continue
         root = git_root(project) if project.is_dir() and not project.is_symlink() else project
         identity = _key(project, system)
         if identity in seen:
@@ -223,7 +230,7 @@ def collect_projects(writer: BundleWriter, *, home: Path, config: MachineConfig,
                 record["claude_session_count"] = sum(source.is_file() and not source.is_symlink()
                                                      for source in session_dir.glob("*.jsonl"))
         if "claude" in agents and record["exists"]:
-            for source in _local_settings(project):
+            for source in _local_settings(project,excluded=excluded):
                 if _owner(str(source), config.core_projects, system) != identity:
                     continue
                 relative = source.relative_to(project).as_posix()
@@ -236,7 +243,7 @@ def collect_projects(writer: BundleWriter, *, home: Path, config: MachineConfig,
                 except (OSError, ValueError, UnicodeError):
                     result.warnings.append({"code": "E7202", "message": "一个项目本地权限文件无法安全读取"})
                     continue
-                if SECRET.search(data.decode("utf-8", errors="replace")):
+                if private_text(data):
                     result.exclusions.append({"logical_path": f"project:{pid}/{relative}", "source_path": str(source), "reason": "secret_hit"})
                     result.warnings.append({"code": "E7203", "message": "一个项目本地权限文件命中凭据特征，已跳过"})
                     continue

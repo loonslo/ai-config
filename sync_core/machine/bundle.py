@@ -13,6 +13,7 @@ import uuid
 import zipfile
 import zlib
 from typing import Any
+from .privacy import private_text, private_metadata
 
 MAX_MEMBERS = 20_000
 MAX_FILE_BYTES = 64 * 1024 * 1024
@@ -164,6 +165,16 @@ class BundleWriter:
         self.root_hint = root_hint or {}
         self.entries: list[dict[str, Any]] = []
         self._files: dict[str, bytes] = {}
+
+    def check_privacy(self, *, projects: list[dict[str, Any]], exclusions: list[dict[str, Any]],
+                      warnings: list[dict[str, Any]]) -> None:
+        """Check all exported bytes and metadata before preview or publication."""
+        metadata = {'source': self.source, 'root_hint': self.root_hint,
+                    'entries': self.entries, 'projects': projects,
+                    'exclusions': exclusions, 'warnings': warnings,
+                    'destination': str(self.destination)}
+        if private_metadata(metadata) or any(private_text(data) for data in self._files.values()):
+            raise BundleError('private content in migration output')
 
     def add_file(self, archive_path: str, data: bytes, *, agent: str, instance: str, kind: str,
                  logical_path: str, tier: int = 1, mode: str = "file", restore: str = "auto",

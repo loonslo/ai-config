@@ -34,7 +34,7 @@ def filter_folders(paths: list[str], *, home: Path, patterns: tuple[str, ...], o
             names.append(path.relative_to(home).as_posix())
         compare = [value.casefold() if os_name == "windows" else value for value in names]
         excludes = [pattern.casefold() if os_name == "windows" else pattern for pattern in patterns]
-        if any(fnmatchcase(value, pattern) or (pattern.endswith("/**") and value == pattern[:-3])
+        if any(fnmatchcase(value, pattern) or (pattern.endswith("/**") and fnmatchcase(value, pattern[:-3]))
                for value in compare for pattern in excludes):
             continue
         identity = norm(path, os_name).casefold() if os_name == "windows" else norm(path, os_name)
@@ -115,7 +115,7 @@ def guide_backup(*, io: GuideIO | None = None, home: Path | None = None,
             ui.say(f"{KIND_LABELS[kind]}：{count} 个文件。")
         ui.say(f"已批准的操作共 {plan.project_result.local_rules} 条。")
         if plan.exclusions:
-            ui.say(f"有 {len(plan.exclusions)} 个文件因为可能含密码、不是文本或过大，没有放进备份。请核对位置：")
+            ui.say(f"有 {len(plan.exclusions)} 项内容可能含密码、不是文本、过大或按你的选择排除，没有放进备份。请核对位置：")
             for item in plan.exclusions:
                 ui.say(REASON_LABELS.get(item["reason"], "需要人工核对"))
                 ui.data(item.get("source_path", item["logical_path"]))

@@ -13,7 +13,8 @@ import uuid
 AGENT_LABELS = {"claude": "Claude", "codex": "Codex", "workbuddy": "WorkBuddy", "workbuddy-ai": "WorkBuddy AI"}
 KIND_LABELS = {"rules": "规则", "settings_fields": "设置", "permissions_local": "已批准的操作",
                "persona": "人设", "skills_text": "技能", "memory": "记忆", "trust_fields": "信任的文件夹"}
-REASON_LABELS = {"secret_hit": "可能含密码", "non_text": "不是文本", "too_large": "文件过大"}
+REASON_LABELS = {"secret_hit": "可能含密码或私人信息", "non_text": "不是文本", "too_large": "文件过大",
+                 "excluded_by_config":"按你的选择排除"}
 _ENGLISH = re.compile(r"(?i)(?<![A-Za-z0-9_])(?:bundle|agent|instance|profile|preflight|dry-run|apply|undo|rules|settings_fields|permissions_local|persona|skills_text|memory|trust|trust_fields|orphan|dead_path|root-map|project_id|content_id|sha256|manifest|schema|tier|journal|state|store)(?![A-Za-z0-9_])")
 _CHINESE = ("迁移包", "预检", "预览", "孤儿", "映射", "设备 ID", "档", "事务")
 

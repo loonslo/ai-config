@@ -66,6 +66,7 @@ class BackupPlan:
         return all(result.verify_sources_unchanged() for result in self.collections)
 
     def preview(self) -> dict[str, Any]:
+        self.check_privacy()
         return {"mode": "preview", "destination": str(self.writer.destination),
                 "agents": sorted(self.selected_agents), "entries": len(self.writer.entries),
                 "by_agent": dict(Counter(item["agent"] for item in self.writer.entries)),
@@ -75,6 +76,10 @@ class BackupPlan:
                           for item in self.writer.entries if item["flags"]],
                 "exclusions": self.exclusions, "warnings": self.warnings,
                 "content_id": content_id(self.writer.entries)}
+
+    def check_privacy(self) -> None:
+        self.writer.check_privacy(projects=self.project_result.projects,
+                                  exclusions=self.exclusions, warnings=self.warnings)
 
 
 def _summary(writer: BundleWriter, projects: ProjectResult, exclusions: list[dict[str, Any]],
@@ -132,7 +137,8 @@ def prepare_backup(*, home: Path, config: MachineConfig, out: Path, name: str = 
     projects = collect_projects(writer, home=home, config=config, environ=env, agents=selected, os_name=system)
     workbuddy = collect_workbuddy(writer, home=home, config=config, environ=env, agents=selected, os_name=system)
     collections = (tier1, projects, workbuddy)
-    exclusions = [item for result in collections for item in result.exclusions]
+    exclusions = list({(item.get('source_path',item['logical_path']),item['reason']):item
+                       for result in collections for item in result.exclusions}.values())
     warnings = [item for result in collections for item in result.warnings]
     inventory = reinstall_inventory(home=home, environ=env, agents=selected, instances=config.instances)
     add_reinstall_reports(writer, inventory)
@@ -143,12 +149,14 @@ def prepare_backup(*, home: Path, config: MachineConfig, out: Path, name: str = 
     writer.add_report("software.json", json.dumps(software_report, ensure_ascii=False, sort_keys=True, allow_nan=False) + "\n")
     writer.add_report("summary.md", _summary(writer, projects, exclusions, warnings, software_report))
     plan = BackupPlan(writer, selected, tuple(roots.values()), config.core_projects, collections, projects, exclusions, warnings)
+    plan.check_privacy()
     if not plan.verify_sources_unchanged():
         raise BundleError("a selected source changed during collection")
     return plan
 
 
 def apply_backup(plan: BackupPlan) -> dict[str, Any]:
+    plan.check_privacy()
     validate_output(plan.writer.destination.parent, roots=plan.roots, projects=plan.core_projects)
     if not plan.verify_sources_unchanged():
         raise BundleError("a selected source changed after preview")

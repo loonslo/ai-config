@@ -19,8 +19,9 @@ from .catalog import (
     CLAUDE_FIELDS_AUTO, CLAUDE_FIELDS_CONFIRM, CODEX_FIELDS_CONFIRM,
     allowed_item, denied_path,
 )
-from .config import MachineConfig, load_config
+from .config import MachineConfig, load_config,excluded_path
 from .paths import derive_project_dir, git_root, norm
+from .privacy import personal_text, private_text
 
 _ABSOLUTE = re.compile(r"(?i)(?:\b[A-Z]:[\\/]|(?<!\w)/(?:Users|home|workspace|Volumes)/)")
 
@@ -81,16 +82,16 @@ def _read(path: Path, boundary: Path) -> bytes:
     return data
 
 
-def _files_below(root: Path) -> Iterator[Path]:
-    if not root.is_dir() or root.is_symlink():
+def _files_below(root: Path, *, excluded=lambda path: False) -> Iterator[Path]:
+    if not root.is_dir() or root.is_symlink() or excluded(root):
         return
     for folder, directories, files in os.walk(root, followlinks=False):
         parent = Path(folder)
         directories[:] = [name for name in directories
-                          if not (parent / name).is_symlink() and not denied_path(name)]
+                          if not (parent / name).is_symlink() and not denied_path(name) and not excluded(parent/name)]
         for name in sorted(files):
             path = parent / name
-            if path.is_file() and not path.is_symlink() and not denied_path(path.relative_to(root).as_posix()):
+            if path.is_file() and not path.is_symlink() and not denied_path(path.relative_to(root).as_posix()) and not excluded(path):
                 yield path
 
 
@@ -134,7 +135,7 @@ def _add_whole(writer: BundleWriter, result: CollectionResult, *, agent: str, so
         result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "non_text", "size": len(data),
                                   "sha256": hashlib.sha256(data).hexdigest()})
         return
-    if SECRET.search(data.decode("utf-8", errors="replace")) and source not in allow_secret_hit_paths:
+    if personal_text(data) or (SECRET.search(data.decode("utf-8", errors="replace")) and source not in allow_secret_hit_paths):
         result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "secret_hit"})
         return
     archive_path = (f"files/{agent}/main/{relative}" if project is None
@@ -210,7 +211,7 @@ def _fields(writer: BundleWriter, result: CollectionResult, *, agent: str, sourc
     except (TypeError, ValueError):
         result.warnings.append({"code": "E7103", "message": "所选设置字段无法安全编码"})
         return
-    if SECRET.search(derived.decode("utf-8")):
+    if private_text(derived):
         result.exclusions.append({"logical_path": logical, "reason": "secret_hit"})
         return
     writer.add_file(f"files/{agent}/main/{filename}", derived, agent=agent, instance="main",
@@ -227,28 +228,40 @@ def collect_tier1(writer: BundleWriter, *, home: Path, config: MachineConfig | N
     selected = config or load_config(home=home)
     system = os_name or platform.system().lower()
     result = CollectionResult()
+    def excluded(path: Path,boundary: Path | None=None) -> bool:
+        if not excluded_path(path,config=selected,home=home,os_name=system,boundary=boundary):
+            return False
+        result.exclusions.append({'logical_path':norm(path,system),'source_path':str(path),'reason':'excluded_by_config'})
+        return True
     for agent in ("claude", "codex"):
         if agent not in agents:
             continue
         root = _root(home, env, agent)
+        if excluded(root):
+            continue
         if not root.is_dir() or root.is_symlink():
             result.warnings.append({"code": "E7104", "message": f"{agent} 配置目录不存在或是链接，已跳过"})
             continue
         rule_names = ("CLAUDE.md",) if agent == "claude" else ("AGENTS.md", "AGENTS.override.md")
         for name in rule_names:
             source = root / name
+            if excluded(source,root):
+                continue
             if source.is_file() and not source.is_symlink():
                 _add_whole(writer, result, agent=agent, source=source, boundary=root, relative=name,
                            allow_secret_hit_paths=selected.allow_secret_hit_paths)
         if agent == "claude":
-            for source in _files_below(root / "rules"):
+            for source in _files_below(root / "rules",excluded=lambda path:excluded(path,root)):
                 relative = source.relative_to(root).as_posix()
                 _add_whole(writer, result, agent=agent, source=source, boundary=root, relative=relative,
                            allow_secret_hit_paths=selected.allow_secret_hit_paths)
-            _fields(writer, result, agent=agent, source=root / "settings.json", root=root,
-                    selected_desktop=selected.include_desktop_fields, os_name=system)
+            if not excluded(root/'settings.json',root):
+                _fields(writer, result, agent=agent, source=root / "settings.json", root=root,
+                        selected_desktop=selected.include_desktop_fields, os_name=system)
             visited: set[str] = set()
             for folder in selected.core_projects:
+                if excluded(folder):
+                    continue
                 if not folder.is_dir() or folder.is_symlink():
                     continue
                 git_folder = git_root(folder)
@@ -263,15 +276,16 @@ def collect_tier1(writer: BundleWriter, *, home: Path, config: MachineConfig | N
                 pid = project_id(git_folder, system)
                 result.project_ids.append(pid)
                 memory_root = root / "projects" / encoded / "memory"
-                for source in _files_below(memory_root):
+                for source in _files_below(memory_root,excluded=lambda path:excluded(path,root)):
                     relative = source.relative_to(root).as_posix()
                     _add_whole(writer, result, agent=agent, source=source, boundary=root, relative=relative,
                                project=pid, archive_relative=source.relative_to(memory_root).as_posix(),
                                allow_secret_hit_paths=selected.allow_secret_hit_paths)
         else:
-            _fields(writer, result, agent=agent, source=root / "config.toml", root=root,
-                    selected_desktop=selected.include_desktop_fields, os_name=system)
-            for source in _files_below(root / "skills"):
+            if not excluded(root/'config.toml',root):
+                _fields(writer, result, agent=agent, source=root / "config.toml", root=root,
+                        selected_desktop=selected.include_desktop_fields, os_name=system)
+            for source in _files_below(root / "skills",excluded=lambda path:excluded(path,root)):
                 relative = source.relative_to(root).as_posix()
                 _add_whole(writer, result, agent=agent, source=source, boundary=root, relative=relative,
                            allow_secret_hit_paths=selected.allow_secret_hit_paths)

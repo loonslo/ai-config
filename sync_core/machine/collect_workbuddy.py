@@ -6,40 +6,41 @@ import os
 from pathlib import Path
 from typing import Iterator, Mapping
 
-from sync_core.utils import SECRET
+from .privacy import private_text
 
 from .bundle import BundleWriter
 from .catalog import allowed_item, denied_path
 from .collect_projects import _key, _owner
 from .collect_tier1 import CollectionResult, _flags, _read, project_id
-from .config import MachineConfig
+from .config import MachineConfig,excluded_path
+from .paths import norm
 
 
 _INSTANCES = ("workbuddy", "workbuddy-ai")
 _SKIP = frozenset({".git", "node_modules", "worktrees"})
 
 
-def _files(root: Path) -> Iterator[Path]:
-    if not root.is_dir() or root.is_symlink():
+def _files(root: Path, *, excluded=lambda path: False) -> Iterator[Path]:
+    if not root.is_dir() or root.is_symlink() or excluded(root):
         return
     for current, directories, files in os.walk(root, followlinks=False):
         folder = Path(current)
         directories[:] = [name for name in directories if not (folder / name).is_symlink()
-                          and not denied_path((folder / name).relative_to(root).as_posix())]
+                          and not denied_path((folder / name).relative_to(root).as_posix()) and not excluded(folder/name)]
         for name in sorted(files):
             source = folder / name
-            if source.is_file() and not source.is_symlink() and not denied_path(source.relative_to(root).as_posix()):
+            if source.is_file() and not source.is_symlink() and not denied_path(source.relative_to(root).as_posix()) and not excluded(source):
                 yield source
 
 
-def _project_roots(project: Path, instance: str) -> Iterator[Path]:
+def _project_roots(project: Path, instance: str, *, excluded=lambda path: False) -> Iterator[Path]:
     pending = [(project, 0)]
     while pending:
         folder, depth = pending.pop()
-        if folder.is_symlink():
+        if folder.is_symlink() or excluded(folder):
             continue
         candidate = folder / f".{instance}"
-        if candidate.is_dir() and not candidate.is_symlink():
+        if candidate.is_dir() and not candidate.is_symlink() and not excluded(candidate):
             yield candidate
         if depth == 2:
             continue
@@ -79,7 +80,7 @@ def _add(writer: BundleWriter, result: CollectionResult, *, source: Path, bounda
     if text is None:
         result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "non_text", "size": len(data), "sha256": digest})
         return
-    if SECRET.search(text):
+    if private_text(text):
         result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "secret_hit"})
         return
     writer.add_file(archive, data, agent=instance, instance=instance, kind=item.kind,
@@ -93,24 +94,35 @@ def collect_workbuddy(writer: BundleWriter, *, home: Path, config: MachineConfig
     """Never open settings, account state, credentials, migration markers or DBs."""
     env = os.environ if environ is None else environ
     result = CollectionResult()
+    def excluded(path: Path,boundary: Path | None=None) -> bool:
+        if not excluded_path(path,config=config,home=home,os_name=os_name,boundary=boundary):
+            return False
+        result.exclusions.append({'logical_path':norm(path,os_name),'source_path':str(path),'reason':'excluded_by_config'})
+        return True
     for instance in _INSTANCES:
         if instance not in agents:
             continue
         root = config.instances.get(instance, Path(env.get(instance.upper().replace("-", "_") + "_HOME", str(home / f".{instance}"))))
+        if excluded(root):
+            continue
         if not root.is_dir() or root.is_symlink():
             continue
         for name in ("BOOTSTRAP.md", "IDENTITY.md", "SOUL.md", "USER.md", "MEMORY.md"):
             source = root / name
+            if excluded(source,root):
+                continue
             if source.is_file() and not source.is_symlink():
                 _add(writer, result, source=source, boundary=root, relative=name,
                      archive=f"files/{instance}/{instance}/{name}", instance=instance, scope="agent", pid=None)
         for branch in ("memory", "skills"):
-            for source in _files(root / branch):
+            for source in _files(root / branch,excluded=lambda path:excluded(path,root)):
                 relative = source.relative_to(root).as_posix()
                 _add(writer, result, source=source, boundary=root, relative=relative,
                      archive=f"files/{instance}/{instance}/{relative}", instance=instance, scope="agent", pid=None)
         visited: set[str] = set()
         for project in config.core_projects:
+            if excluded(project):
+                continue
             if not project.is_dir() or project.is_symlink():
                 continue
             identity = _key(project, os_name)
@@ -118,9 +130,9 @@ def collect_workbuddy(writer: BundleWriter, *, home: Path, config: MachineConfig
                 continue
             visited.add(identity)
             pid = project_id(project, os_name)
-            for folder in _project_roots(project, instance):
+            for folder in _project_roots(project, instance,excluded=excluded):
                 for branch in ("memory", "skills"):
-                    for source in _files(folder / branch):
+                    for source in _files(folder / branch,excluded=lambda path:excluded(path,project)):
                         if _owner(str(source), config.core_projects, os_name) != _owner(str(project), config.core_projects, os_name):
                             continue
                         relative = source.relative_to(folder.parent).as_posix()

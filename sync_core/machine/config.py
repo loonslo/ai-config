@@ -7,11 +7,12 @@ import ntpath
 import os
 from pathlib import Path
 import posixpath
+from fnmatch import fnmatchcase
 from typing import Any
 
 from sync_core.layout import data_root
 from .catalog import CODEX_DESKTOP_FIELDS
-from .paths import RootMap
+from .paths import RootMap,norm,same_path
 
 
 DEFAULT_EXCLUDES = (
@@ -33,6 +34,22 @@ class MachineConfig:
     include_desktop_fields: frozenset[str]
     allow_secret_hit_paths: frozenset[Path]
     running_process_names: tuple[str, ...]
+
+
+def excluded_path(path: Path, *, config: MachineConfig, home: Path, os_name: str,
+                  boundary: Path | None=None) -> bool:
+    """Match full, home-relative and project/agent-relative paths before reads."""
+    if same_path(path,home,os_name):
+        return True
+    names=[norm(path,os_name)]
+    for root in (home,*config.core_projects,*((boundary,) if boundary is not None else ())):
+        if path.is_relative_to(root):
+            names.append(path.relative_to(root).as_posix())
+    windows=os_name in {'windows','nt','win32'}
+    values=[name.casefold() if windows else name for name in names]
+    patterns=[norm(pattern,os_name).casefold() if windows else pattern for pattern in config.exclude_patterns]
+    return any(fnmatchcase(value,pattern) or pattern.endswith('/**') and fnmatchcase(value,pattern[:-3])
+               for value in values for pattern in patterns)
 
 
 def _path(value: Any) -> Path:
@@ -79,7 +96,7 @@ def load_config(path: Path | None = None, *, home: Path | None = None, source_os
     if not isinstance(data, dict) or set(data) - _KEYS:
         raise ValueError("unknown machine configuration keys")
     projects = tuple(_path(value) for value in _list(data.get("core_projects", []), "core_projects"))
-    excludes = tuple(_list(data.get("exclude_patterns", list(DEFAULT_EXCLUDES)), "exclude_patterns"))
+    excludes = tuple(_list(data.get("exclude_patterns", [*DEFAULT_EXCLUDES,norm(home,source_os)]), "exclude_patterns"))
     mappings = data.get("root_map", [])
     if not isinstance(mappings, list) or any(not isinstance(item, dict) or set(item) != {"from", "to"} for item in mappings):
         raise ValueError("root_map must contain from/to pairs")

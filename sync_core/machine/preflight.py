@@ -11,7 +11,8 @@ import re
 from typing import Any, Iterable, Mapping
 import tomllib
 
-from sync_core.utils import SECRET, digest
+from sync_core.utils import digest
+from .privacy import private_text, private_metadata
 
 from .backup import AGENTS, agent_roots
 from .bundle import BundleError, MAX_FILE_BYTES, read_bundle
@@ -266,6 +267,8 @@ def preflight(bundle: Path, *, home: Path, config: MachineConfig, agents: frozen
     import os
     system=os_name or platform.system().lower()
     manifest,files=read_bundle(bundle)
+    if private_metadata(manifest) or any(private_text(data) for data in files.values()):
+        raise BundleError('private content in migration output')
     roots=agent_roots(home,config,os.environ if environ is None else environ)
     selected=agents if agents is not None else frozenset(AGENTS)
     if not selected or selected-AGENTS:
@@ -299,8 +302,6 @@ def preflight(bundle: Path, *, home: Path, config: MachineConfig, agents: frozen
                 raise BundleError('invalid agent')
             continue
         data=files[entry['archive_path']]
-        if SECRET.search(data.decode('utf-8',errors='replace')):
-            raise BundleError('credential-like restored content')
         try:
             target,boundary,reason=_destination(entry,roots=roots,projects=projects,records=records,mapper=mapper,system=system)
             current=target_bytes(target) if target else None

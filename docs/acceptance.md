@@ -520,3 +520,16 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 - 净室准备清单已保存 `docs/machine-cleanroom-checklist.md`，未因此标记 MK-40 完成。MK-28 真机另需 G3＋G2，MK-40 的环境须 G8，MK-41 每次真实 apply 须 G4，信任须 G5，新手试用须 G9。没有运行真实工作区恢复、创建 Windows 用户／虚拟机、读取会话正文、推送新分支或实施可选 P7。
 
 - P3 交付前本地摘要自检：必填／唯一字段、未加引号日期、active 状态与 102 个稳定 evidence 路径通过，未使用外部日常同步工具。
+
+### MK-12／MK-26 交付复查与隐私修正（2026-10-02）
+
+- 复查发现配置排除仅用于向导选择文件夹，专家采集未统一应用。现按完整／主目录相对／核心项目相对／助手根相对路径匹配；HOME 本身始终排除，`/**` 同时排除根目录。遍历前剪枝、候选读取前过滤，多个采集器的排除记录去重；不会读取被排除文件正文。隔离 HOME 的哨兵断言验证项目子目录与自建技能均零读取，源树未变。
+- 定向：核心 Python 3.14 隔离环境，`tmp/venv-mk02-core/Scripts/python.exe -B -m pytest tests/test_machine_exclusions.py tests/test_machine_backup.py tests/test_machine_collect_tier1.py tests/test_machine_collect_workbuddy.py tests/test_machine_collect_projects.py -q --basetemp tmp/run-mk12-excludes-20261002-a` → **14 passed，14.04 秒**。剪枝完善后全 machine＋启动器／bootstrap → **93 passed，70.25 秒**，`--basetemp tmp/run-machine-final-20261002-b`。历史排除基线未全部重新核对，MK-12 不标为全部验收。
+- 只读检查已生成首份 ZIP，发现 **4 个文件命中邮箱格式**；不输出匹配值，不判定这些是否为实际邮箱或示例／标识，按 §5.6 一律保守排除。原检测覆盖密钥而遗漏邮箱／URL 用户信息，首份 ZIP 的完整性验证及原 M1 范围确认保留为历史，不能作为隐私验收通过。未改变源数据或删除原 ZIP。
+- `privacy.py` 对邮箱、URL 用户信息、Unicode 转义及原有 SECRET 特征检测；采集器排除命中文本，预览／发布前检查全部文件、报告和元数据，恢复在读取目标文件前拒绝含私人信息的旧包。邮箱／URL 用户信息不能通过逐文件秘密例外放行，最终输出仍受整体门禁约束。无法证明安全的报告／路径直接拒绝，错误不带匹配值；不改写源文本。
+- 首轮隐私定向 **1 failed／15 passed**，暴露整文件采集未识别转义邮箱，完善检测后 `tests/test_machine_privacy.py` → **8 passed，9.23 秒**，`--basetemp tmp/run-machine-privacy-20261002-b`。新增覆盖多类采集、转义、路径例外不能放行邮箱、报告／元数据与预览后改动拒绝，以及旧包在目标读取前拒绝。
+- 最终合并：PowerShell `$machineTests = @(rg --files tests -g 'test_machine_*.py')`，`& tmp/venv-mk02-core/Scripts/python.exe -B -m pytest @machineTests tests/test_launchers.py tests/test_start_bootstrap.py -q --basetemp tmp/run-machine-privacy-full-20261002-c` → **101 passed，69.89 秒**。全部隔离 HOME，未跑真实恢复；diff 检查通过、`scripts/check-secrets.ps1` **0 findings**。共用撤销接口的 54 项回归沿用同日已执行记录，本次未重复冻结范围全量测试。
+- 负责人在修正摘要及“保留 196 条／11 项目、排除 4 条”的说明后明确授权 **本次修正版 G3**。只读取原 ZIP 并验证原 SHA-256，重建批准的既有快照，未再次读助手目录／白名单数据库，未刷新源数据。额外排除：项目本地操作许可 1、WorkBuddy 记忆 1、WorkBuddy AI 人设 1、项目 WorkBuddy AI 技能 1；对应文件正文完整移除。项目权限文件／规则／绝对路径计数按保留内容重算，其余机器画像仍为原快照；摘要明确标注此来源。
+- 实际修正版 `AI备份-修正版-20261002-211502.zip`：**668504 B，196 条，11 项目，排除 7**；Claude 78、Codex 38、WorkBuddy 11、WorkBuddy AI 63、报告 6。SHA-256 **`b7b97f841e03020b0aab81c0f09fca6fb3c23ec2ac0664fe488dd473338703c7`**；content_id **`d85c1a273a2a40475bd5d9326f40dbd68675a5893c17659eabc4fd02dfbf7962`** 与批准前内存预览一致。发布后独立有界读取／哈希检查通过，私人信息命中文件 **0**、元数据 **0**；原 ZIP SHA-256 仍为 `9c3fdab00f7a706491f51520df6889c84cb6dc8bd98417ff230d68804b878002`，原包保留。正则检查通过不保证发现所有形式的私人信息，仍须保管为个人备份。
+- 负责人已回复“暂时没有净室”。MK-40／41／42／44 等待环境，真实加载、双击、U 盘、Mac 及 CI 均不因此完成；未在日常工作区恢复、未推送 feat 分支、未调用外部日常同步工具。
+- 本次本地 PROJECT_STATUS 契约自检：必填／唯一字段、真实未加引号日期、waiting 状态、非空概览／进展／下一步与 **105 个**现存稳定 evidence 路径通过。未使用外部同步工具；该检查仅确认摘要格式和证据路径。
