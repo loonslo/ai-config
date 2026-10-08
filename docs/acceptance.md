@@ -563,6 +563,10 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 
 未验收：0.3.2 原生升级后的用户现场窗口操作和第二台电脑真实助手加载。0.3.0/0.3.1 安装包保留，修复包单独发布。
 
+## 2026-10-08 GitHub Windows 安装包
+
+在 GitHub 发布 [v0.3.2 预发布页](https://github.com/loonslo/ai-config/releases/tag/v0.3.2)，包含 Windows x64 NSIS 安装包、源码/产物 SHA-256 清单和完整 NOTICE 归档。安装包 23,880,226 字节，SHA-256 `8701613747a6f4b22187c65202c0628451fa4b4fca9b662f88d30d493ac7e1e0`；GitHub 资产返回的 digest 与本地一致。清单在干净提交 `ad686d888b7ab091194f644ddc0e09447fe9f943` 重新生成，172 个源码文件哈希与发布源码匹配，`dirty=false`。Release 按预发布标记；代码签名未验证，原生安装升级及第二台电脑真实助手加载仍未验收。
+
 ## 2026-10-08 安装后问题排查与 0.3.1 修复（OF-07）
 
 交付检查：`scripts/check-secrets.ps1` 返回 0 findings，`git diff --check` 通过；本项目内自检 PROJECT_STATUS 必填字段、唯一字段、日期、状态和 114 个 evidence 路径通过，0.3.1 发布清单源文件哈希及安装包大小/SHA256 一致。未调用跨项目日常同步工具。浏览器测试页已关闭，临时 Vite 服务已停止。

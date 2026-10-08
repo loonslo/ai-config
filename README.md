@@ -6,6 +6,8 @@
 
 当前桌面端已接入备份、恢复、文件核验与撤销引擎。原 `.aiconfig` 迁移界面已替换，旧格式不进入新恢复流程。命令脚本仅保留为历史开发工具，不是交付入口，不要求用户安装 Python、Git 或打开终端。Windows 安装包重建及实际检查见 [验收记录](docs/acceptance.md)；真实跨机、助手加载和 Mac 验收仍未完成。
 
+Windows x64 预览安装包：前往 [GitHub 0.3.2 Release](https://github.com/loonslo/ai-config/releases/tag/v0.3.2) 下载 `AI-Config-0.3.2-Windows-x64-setup.exe`。SHA-256：`8701613747a6f4b22187c65202c0628451fa4b4fca9b662f88d30d493ac7e1e0`。该版本尚未完成原生升级和真实跨机加载验收，代码签名未验证。
+
 使用方法见 [一页上手](docs/quickstart.md)，当前实施记录见 [桌面离线迁移任务](docs/desktop-offline-migration.md)。
 
 ## 历史桌面与服务器说明（2026-10-02 及以前）
