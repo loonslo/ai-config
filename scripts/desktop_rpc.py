@@ -13,7 +13,7 @@ ROOT = (
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sync_core.application.protocol import ApplicationProtocol
+from sync_core.application.machine_protocol import MachineProtocol
 from sync_core.layout import default_device_config_path
 
 
@@ -28,7 +28,7 @@ def main() -> None:
                 stream.reconfigure(encoding="utf-8", errors="replace")
             except (AttributeError, OSError, ValueError):
                 pass
-    ApplicationProtocol(
+    MachineProtocol(
         args.local or default_device_config_path(),
         template_root=args.template_root,
     ).serve(sys.stdin, sys.stdout)

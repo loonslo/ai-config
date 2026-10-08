@@ -1,5 +1,8 @@
 # 桌面端本机 JSON Lines 协议 v1
 
+> 当前桌面协议（2026-10-08）仅接受 `machine_detect`、`machine_backup`、`machine_restore`、`machine_history`、`machine_undo`。参数契约见 `schemas/machine-desktop-rpc.schema.json`，适配层见 `sync_core/application/machine_protocol.py`。下文旧操作为历史兼容资料，不由桌面 sidecar 接受。
+
+
 状态：DT-04 本机协议已实现；DT-19 增加了本机 `package_import` 事务导入操作并通过定向测试。Windows Tauri 与 Python sidecar 原型现已接入 DT-07～12 的设置、迁入／编辑、差异、接管、加载核验、历史恢复、记忆映射和项目接续操作；离线包导入页面、冲突选择 UI、原生窗口、干净账户安装和真实远端流程仍未验收。客户端尚未全功能交付。协议由 Tauri Shell 插件经 stdin/stdout 调用随程序启动的 Python 辅助程序，业务仍由 `ApplicationService` 执行。客户端和辅助程序运行在同一台电脑；该接口本身不做登录、上传服务器或设备间同步。
 
 ## 传输和请求

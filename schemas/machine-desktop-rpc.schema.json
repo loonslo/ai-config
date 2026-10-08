@@ -1,0 +1,514 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-config.local/schemas/machine-desktop-rpc.schema.json",
+  "title": "AI Config original-file desktop protocol",
+  "description": "One JSON object per input/output line. Python performs additional operation-specific validation and never accepts shell commands.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/previewRequest"
+    },
+    {
+      "$ref": "#/$defs/applyRequest"
+    },
+    {
+      "$ref": "#/$defs/cancelRequest"
+    },
+    {
+      "$ref": "#/$defs/shutdownRequest"
+    },
+    {
+      "$ref": "#/$defs/acceptedEvent"
+    },
+    {
+      "$ref": "#/$defs/progressEvent"
+    },
+    {
+      "$ref": "#/$defs/cancelResultEvent"
+    },
+    {
+      "$ref": "#/$defs/shutdownAcceptedEvent"
+    },
+    {
+      "$ref": "#/$defs/resultEvent"
+    }
+  ],
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requestBase": {
+      "type": "object",
+      "required": [
+        "protocol_version",
+        "request_id",
+        "type"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": 1
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "applyRequest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/requestBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "plan_id"
+          ],
+          "properties": {
+            "type": {
+              "const": "apply"
+            },
+            "plan_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "cancelRequest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/requestBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "job_id"
+          ],
+          "properties": {
+            "type": {
+              "const": "cancel"
+            },
+            "job_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "shutdownRequest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/requestBase"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "shutdown"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "eventBase": {
+      "type": "object",
+      "required": [
+        "protocol_version",
+        "type"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": 1
+        },
+        "request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "job_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "acceptedEvent": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "request_id",
+            "job_id"
+          ],
+          "properties": {
+            "type": {
+              "const": "accepted"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": true
+    },
+    "progressEvent": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "request_id",
+            "job_id",
+            "stage"
+          ],
+          "properties": {
+            "type": {
+              "const": "progress"
+            },
+            "stage": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": true
+    },
+    "cancelResultEvent": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "request_id",
+            "job_id",
+            "status"
+          ],
+          "properties": {
+            "type": {
+              "const": "cancel_result"
+            },
+            "status": {
+              "enum": [
+                "accepted",
+                "too_late",
+                "already_finished",
+                "not_found"
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": true
+    },
+    "shutdownAcceptedEvent": {
+      "type": "object",
+      "required": [
+        "protocol_version",
+        "request_id",
+        "type"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": 1
+        },
+        "request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "const": "shutdown_accepted"
+        }
+      },
+      "additionalProperties": false
+    },
+    "resultEvent": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/eventBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "request_id",
+            "status"
+          ],
+          "properties": {
+            "type": {
+              "const": "result"
+            },
+            "status": {
+              "enum": [
+                "preview",
+                "applied",
+                "cancelled",
+                "failed"
+              ]
+            },
+            "result": {},
+            "error": {
+              "type": "object",
+              "required": [
+                "code",
+                "message"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": true
+    },
+    "previewRequest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/requestBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "operation"
+          ],
+          "properties": {
+            "protocol_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "type": {
+              "const": "preview"
+            },
+            "operation": {
+              "enum": [
+                "machine_detect",
+                "machine_history",
+                "machine_backup",
+                "machine_restore",
+                "machine_undo"
+              ]
+            },
+            "params": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "operation": {
+                    "const": "machine_detect"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [],
+                    "properties": {}
+                  }
+                },
+                "required": []
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "operation": {
+                    "const": "machine_history"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [],
+                    "properties": {}
+                  }
+                },
+                "required": []
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "operation": {
+                    "const": "machine_backup"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "destination"
+                    ],
+                    "properties": {
+                      "destination": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "agents": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "items": {
+                          "enum": [
+                            "codex",
+                            "claude",
+                            "workbuddy",
+                            "workbuddy-ai"
+                          ]
+                        }
+                      },
+                      "projects": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "params"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "operation": {
+                    "const": "machine_restore"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "bundle"
+                    ],
+                    "properties": {
+                      "bundle": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "agents": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "items": {
+                          "enum": [
+                            "codex",
+                            "claude",
+                            "workbuddy",
+                            "workbuddy-ai"
+                          ]
+                        }
+                      },
+                      "root_map": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "from",
+                            "to"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "from": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "to": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      "confirm_security": {
+                        "type": "boolean"
+                      },
+                      "confirm_trust": {
+                        "type": "boolean"
+                      },
+                      "workbuddy_files": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "params"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "operation": {
+                    "const": "machine_undo"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "operation_id"
+                    ],
+                    "properties": {
+                      "operation_id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "params"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

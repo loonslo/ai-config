@@ -153,7 +153,7 @@ def plan_restore(check: Preflight, *, state: Path, process_names: tuple[str,...]
             try:
                 relative=target.relative_to(item.boundary).as_posix()
                 probe=subprocess.run(['git','ls-files','--error-unmatch','--',relative],cwd=item.boundary,
-                                     capture_output=True,timeout=5)
+                                     capture_output=True,timeout=5,stdin=subprocess.DEVNULL)
                 if probe.returncode==0:
                     warnings.append('一个已批准操作文件被 Git 跟踪，请在助手中核对其来源。')
             except (OSError,subprocess.TimeoutExpired):

@@ -533,3 +533,47 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 - 实际修正版 `AI备份-修正版-20261002-211502.zip`：**668504 B，196 条，11 项目，排除 7**；Claude 78、Codex 38、WorkBuddy 11、WorkBuddy AI 63、报告 6。SHA-256 **`b7b97f841e03020b0aab81c0f09fca6fb3c23ec2ac0664fe488dd473338703c7`**；content_id **`d85c1a273a2a40475bd5d9326f40dbd68675a5893c17659eabc4fd02dfbf7962`** 与批准前内存预览一致。发布后独立有界读取／哈希检查通过，私人信息命中文件 **0**、元数据 **0**；原 ZIP SHA-256 仍为 `9c3fdab00f7a706491f51520df6889c84cb6dc8bd98417ff230d68804b878002`，原包保留。正则检查通过不保证发现所有形式的私人信息，仍须保管为个人备份。
 - 负责人已回复“暂时没有净室”。MK-40／41／42／44 等待环境，真实加载、双击、U 盘、Mac 及 CI 均不因此完成；未在日常工作区恢复、未推送 feat 分支、未调用外部日常同步工具。
 - 本次本地 PROJECT_STATUS 契约自检：必填／唯一字段、真实未加引号日期、waiting 状态、非空概览／进展／下一步与 **105 个**现存稳定 evidence 路径通过。未使用外部同步工具；该检查仅确认摘要格式和证据路径。
+
+
+## 2026-10-08 桌面原样离线备份恢复（OF-01～04）
+
+- 负责人本次明确：只保留换机 ZIP 的原样备份恢复能力，以桌面客户端为唯一用户入口；云端冻结，命令向导不作为交付方式。当前任务正本为 `docs/desktop-offline-migration.md`，2026-10-02 的桌面冻结范围已被此次决定取代；历史测试和真机备份没有重新验收。
+- 实现：React 改为备份、恢复、恢复记录三页；助手选择、项目选择／目标映射、安全设置与信任确认、WorkBuddy 文本选择、ZIP 选择／拖入、核验与撤销均接入 MachineProtocol。桌面 sidecar 只接受五个 machine 操作，云端与旧 `.aiconfig` 操作被拒绝。原 `.aiconfig` 文件关联从新构建配置移除，不接管所有 ZIP 的系统关联。用户无需外置 Python 或 Git，源码旧脚本仅为历史开发兼容。
+- 环境：Windows 10 19045 x64，现有 `desktop/.build-venv` Python 3.14.0、pytest 8.4.2；构建复用现有锁定依赖，无新增运行依赖。最初直接 `py -3.14` 缺少 tomlkit，测试未收集成功；随后改用已具备依赖的 3.14 构建环境。一次合并回归发现旧 RPC 子进程测试仍要求 import_config，已将测试改为当前 machine_detect 及合成目录检测。
+- 实际回归：`desktop/.build-venv/Scripts/python.exe -B -m pytest tests/test_machine_desktop.py tests/test_application_protocol.py tests/test_machine_backup.py tests/test_machine_apply.py tests/test_machine_preflight.py tests/test_machine_trust.py tests/test_machine_memory_restore.py tests/test_machine_workbuddy_restore.py tests/test_machine_verify_undo.py tests/test_machine_privacy.py tests/test_machine_exclusions.py -q --basetemp tmp/run-desktop-20261008-e`：**56 passed，40.49 秒**。新增桌面测试覆盖预览零写入、源／目标变化阻止确认、一次性计划、冲突保留与另存、目录映射、自动核验、历史撤销、进程门禁及旧操作拒绝。
+- 前端 `npm run build` 与 `npm run lint` 通过。`scripts/build-desktop-sidecar.ps1` 与 desktop 的 `npm run tauri:build` 通过；Rust 只有链接器“创建库／对象”stdout 提示，构建成功。旧 sidecar 另存 `release-artifacts/ai-config-rpc-before-offline-20261008.exe`；旧 0.2.0 安装包保留。
+- 打包后隔离验证：冻结 exe 用合成 HOME 和独立 AI_CONFIG_HOME、PATH 仅保留 Windows System32，实际完成检测→备份预览→确认 ZIP→恢复预览→确认恢复→核验无 FAIL→历史→撤销→无剩余可撤销记录，退出码 0。第一次演练被正在运行的真实 Codex 进程门禁阻止；随后仅在合成 HOME 配置不匹配真实应用的测试进程名，完成演练，未修改真实助手配置。此证据说明打包 core 无需外置 Python/Git，不代替原生窗口、安装或真实加载。
+- Windows 0.3.0 x64 NSIS：`release-artifacts/AI-Config-0.3.0-Windows-x64-setup.exe`，**23881173 B**，SHA-256 **`a0c310b2b7745a778b08930ad36e8380935d295676ca686debfacbf6aa6b47e9`**。伴随版权归档复制既有完整归档为 `AI-Config-0.3.0-Windows-NOTICES-full.zip`（依赖版本未新增）；来源与范围沿用 `docs/third-party-licenses.md`，不是新平台完整许可证验收。发布清单由 release-manifest.py 记录当前源码哈希和上述文件。
+- 未执行：整个仓库全量回归、原生窗口／选择器／拖拽／关闭时写入保护、干净账户安装、旧版本升级关联清理、签名、真实用户备份与恢复、第二台机器、真实助手规则／记忆加载、新手试用和 Mac。未远程推送，未部署服务器，未调用外部日常库同步工具。
+
+- 交付前复核：`scripts/check-secrets.ps1` 为 **0 findings**，`git diff --check` 通过；PROJECT_STATUS 的唯一字段、未加引号日期、允许状态、非空摘要和 **111 项稳定 evidence 路径**逐项本地自检通过。环境未安装 PyYAML，未引入依赖，按本文件实际采用的 YAML 标量／折叠字符串／列表子集核对格式。未访问外部日常库。发布清单的安装包大小、SHA-256、当前源码文件哈希及安装包副本字节均一致。
+
+
+## 2026-10-08 检查备份一直等待修复（OF-08）
+
+用户明确：0.3.0 在“检查备份内容”后一直等待，尚未进入确认生成。使用合成助手 HOME、正常软件 PATH、持续打开 stdin 的 JSON-lines 服务复现；冻结 sidecar 的诊断堆栈显示阻塞在 paths.git_root → subprocess.run 的超时清理 → communicate → readerthread.join，Git 子进程仍持有管道。仅清理 PyInstaller DLL 搜索路径不能解决，源码 sidecar 同样复现，因此 DLL 根因假设撤回，诊断插桩及 DLL 改动不进入发布。
+
+最小修复：machine 的 Git 项目根、重装来源、登录清单、软件版本、进程检测及恢复 Git 跟踪探测，均显式设置 stdin=subprocess.DEVNULL；外部命令无需读取用户输入，不能继承桌面仍打开的请求通道。修复项目根后调用链推进到登录清单的 Git 探测，补齐其余同类边界后源码、冻结 sidecar 全链通过。
+
+验证日期 2026-10-08，Windows x64、Python 3.14：`desktop/.build-venv/Scripts/python.exe -m pytest tests/test_machine_process_input.py tests/test_machine_desktop.py tests/test_machine_paths.py tests/test_machine_collect_records.py tests/test_machine_collect_login.py tests/test_machine_collect_reinstall.py tests/test_machine_apply.py tests/test_machine_backup.py --basetemp tmp/run-backup-wait-20261008-b -q` → 21 passed in 24.17s。新增测试在子进程 stdin 保持打开时执行真实 Git 探测，等待退出而不调用会关闭 stdin 的 communicate。源码和重建后的冻结 sidecar 在正常 PATH、合成 HOME、无控制台窗口模式完成检测、备份预览、确认 ZIP、恢复、核验、历史和撤销；冻结测试响应包含 preview/applied，没有卡住。测试使用合成文件，未恢复或覆盖真实助手数据。前端 lint 通过。
+
+0.3.2 发布：前端构建、lint、sidecar 重建、Tauri NSIS 构建通过；`release-artifacts/AI-Config-0.3.2-Windows-x64-setup.exe` 为 23,880,226 字节，SHA256 `8701613747a6f4b22187c65202c0628451fa4b4fca9b662f88d30d493ac7e1e0`。同版本发布清单及完整 NOTICE 归档随包保存；安全扫描 0 findings，diff --check 通过。
+
+交付前复核：回归测试增加无控制台创建标志后，使用新 basetemp `tmp/run-backup-wait-20261008-c` 单独复跑输入管道测试，1 passed in 0.40s；PROJECT_STATUS 字段、日期、非空摘要、唯一字段及 115 个稳定 evidence 路径自检通过，0.3.2 发布清单当前源文件和安装包哈希一致。未使用跨项目日常同步工具。
+
+未验收：0.3.2 原生升级后的用户现场窗口操作和第二台电脑真实助手加载。0.3.0/0.3.1 安装包保留，修复包单独发布。
+
+## 2026-10-08 安装后问题排查与 0.3.1 修复（OF-07）
+
+交付检查：`scripts/check-secrets.ps1` 返回 0 findings，`git diff --check` 通过；本项目内自检 PROJECT_STATUS 必填字段、唯一字段、日期、状态和 114 个 evidence 路径通过，0.3.1 发布清单源文件哈希及安装包大小/SHA256 一致。未调用跨项目日常同步工具。浏览器测试页已关闭，临时 Vite 服务已停止。
+
+- 用户报告：安装后看起来未生效／卡住；窗口拉宽后按钮消失，缩窄后可见。本轮不执行真实备份或恢复，不改真实助手文件。
+- 确认的布局根因：MachineApp 根元素为 `app-shell`，沿用 App.css 只定义了 `client-layout` 的两列布局。宽度大于 700 时，侧栏 height 为 100vh，占据整行，主内容落到下方；窄屏媒体查询使侧栏 height 为 auto，才看见内容。现改为正确类名，主区 min-width:0，防止长路径撑出窗口，并调整状态面板间距。
+- 安装检查：进程位于当前用户 Local/AI Config，程序文件版本为 0.3.0；安装的 RPC exe SHA-256 与本轮 0.3.0 sidecar 一致。对安装后的 exe 只运行 machine_detect，退出 0，1.68 秒返回 accepted／progress／preview，识别 4 个助手，stderr 为空。该只读结果不能证明真实窗口所有操作正常。
+- 通信判断边界：最初怀疑 Tauri 去掉换行导致缓冲等待，进一步核对本机 tauri-plugin-shell 2.4.0 和 tauri-utils 2.10.1 源码后发现本版本保留换行，因此撤回“已确认通信根因”的表述。具体卡住的步骤尚未获得用户补充。前端改为直接解析完整行，兼容有／无换行，属于稳健性改进；不把无换行夹具通过当作用户现场根因证明。
+- 等待行为：machine_detect／machine_history 15 秒未响应时恢复控件并显示重试提示，迟到的旧请求结果被忽略；备份／恢复／撤销及确认写入不会因超时解除锁定或误报完成，只显示等待，关闭仍等写入安全结束。增加「重新检测助手」。
+- 实际界面验证：启动 `node node_modules/vite/bin/vite.js --mode ui-test --host 127.0.0.1 --port 5175`，通过浏览器 API 查看真实 React DOM。仅该测试模式将 Tauri 模块映射到 `desktop/tests/tauri-fixture.ts`；生产模式不注入。
+- 五个宽度（高 800）：360／700 使用 flex，main 顶部 110.39；940／1200／1600 使用 grid，main 顶部 0。文档宽度未超过 viewport，按钮右边界均在窗口内；窄屏长页允许正常垂直滚动。分别验证不带换行及 CRLF 的启动检测、选择模拟保存位置、备份预览与确认按钮可见；静默检测 15 秒后提示出现且导航与重试启用；静默 apply 15 秒后继续锁定且没有成功提示。所有路径均为合成 Fixture，无真实备份文件写入。
+- `npm run build`、`npm run lint` 与 `npm run tauri:build` 通过，Rust 仍只有创建链接库／对象的 stdout 提示。Python 引擎未变化，前节 56 项回归为历史本日结果，本轮未重复。复用相同 sidecar 与依赖锁，无新增运行或测试依赖。
+- 新安装包：`release-artifacts/AI-Config-0.3.1-Windows-x64-setup.exe`，23877279 B，SHA-256 `b5df0e212962331a11a33929678a1c3b592554209249f5bb25057c4da4bb2f0d`。旧 0.3.0 包保留；NOTICES-full 沿用同依赖版权归档，发布清单单独记录当前源码及产物。未在用户机执行升级安装。
+- 原生限制：computer-use 能列出安装后的 AI Config 窗口并读到外层 accessibility，但 Windows 窗口截图两次超时；停止原生输入，没有用旧截图或盲点坐标操作。浏览器测试不能代替已安装 WebView、原生文件选择器和实际升级验收。未使用外部日常库，未推送。

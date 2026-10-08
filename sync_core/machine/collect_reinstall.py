@@ -77,7 +77,7 @@ def _git(skill: Path) -> tuple[bool, str | None, str | None]:
     def run(*args: str) -> str | None:
         try:
             result = subprocess.run(("git", "-C", str(skill), *args), capture_output=True,
-                                    text=True, timeout=5, check=False)
+                                    text=True, timeout=5, check=False, stdin=subprocess.DEVNULL)
             return result.stdout.strip() if result.returncode == 0 else None
         except (OSError, subprocess.TimeoutExpired):
             return None

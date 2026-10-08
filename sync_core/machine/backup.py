@@ -111,11 +111,8 @@ def _summary(writer: BundleWriter, projects: ProjectResult, exclusions: list[dic
         lines.append("- WorkBuddy 文本为手动还原候选，自动加载尚未验证。")
     lines += ["",
               "## 如何在新机器还原", "",
-              "保留完整备份文件，先在新电脑安装并启动对应助手一次，再双击「恢复」。也可以把备份文件拖到 Windows 的「恢复」图标上。",
-              "检查选择后确认恢复。已有不同内容会保留；需要回到原状时，再次打开「恢复」选择撤销。WorkBuddy 文本与安全设置默认跳过，需要你明确同意。真实跨机和新手试用尚未验收。", "",
-              "<details><summary>详细信息（技术支持）</summary>", "",
-              "专家入口为 `python scripts/machine.py preflight --bundle <备份文件>`，核对后执行 `python scripts/machine.py restore --bundle <备份文件> --apply`。",
-              "核对用 verify，撤销用 undo。真实目标写入需明确授权，并先在净室演练。", "", "</details>", ""]
+              "保留完整备份文件，先在新电脑安装并启动对应助手一次，再打开 AI Config 桌面客户端的「恢复」。选择备份 ZIP，也可以将它拖进客户端窗口。",
+              "检查选择后确认恢复。已有不同内容会保留；需要回到原状时，在「恢复记录」选择一次恢复，检查后撤销。WorkBuddy 文本与安全设置默认跳过，需要你明确同意。真实跨机和新手试用尚未验收。", ""]
     return "\n".join(lines)
 
 

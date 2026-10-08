@@ -23,7 +23,8 @@ def run_version_command(command: tuple[str, ...]) -> tuple[int, str]:
         program = shutil.which(command[0])
         if program is None:
             return 1, ""
-        result = subprocess.run((program, *command[1:]), capture_output=True, text=True, timeout=10, check=False)
+        result = subprocess.run((program, *command[1:]), capture_output=True, text=True, timeout=10, check=False,
+                                stdin=subprocess.DEVNULL)
     except (OSError, subprocess.TimeoutExpired):
         return 1, ""
     return result.returncode, result.stdout[:1_000_000]

@@ -18,7 +18,7 @@ _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
 def _git_credential_keys() -> list[str]:
     try:
         result = subprocess.run(("git", "config", "--global", "--name-only", "--get-regexp", r"^credential\."),
-                                capture_output=True, text=True, timeout=5, check=False)
+                                capture_output=True, text=True, timeout=5, check=False, stdin=subprocess.DEVNULL)
         return result.stdout.splitlines()[:1000] if result.returncode == 0 else []
     except (OSError, subprocess.TimeoutExpired):
         return []

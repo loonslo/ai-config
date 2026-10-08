@@ -13,7 +13,7 @@ def process_names(*, run: Callable = subprocess.run, os_name: str = os.name) -> 
         command = ["tasklist", "/FO", "CSV", "/NH"]
     else:
         command = ["ps", "-A", "-o", "comm="]
-    result = run(command, capture_output=True, text=True, timeout=10)
+    result = run(command, capture_output=True, text=True, timeout=10, stdin=subprocess.DEVNULL)
     if result.returncode:
         raise ValueError("process inventory unavailable")
     return ([row[0] for row in csv.reader(result.stdout.splitlines()) if row]

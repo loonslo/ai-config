@@ -1,5 +1,8 @@
 # 桌面客户端与跨设备迁移实施任务
 
+> 当前决策（2026-10-08）：桌面客户端恢复推进，只保留原样备份恢复 ZIP；云端继续冻结，命令向导不作为用户入口。以下旧冻结范围及旧 `.aiconfig`／终端交付任务属于历史记录，与本声明冲突处以 [桌面离线迁移任务](docs/desktop-offline-migration.md) 为准。
+
+
 > 状态：已冻结；2026-10-02 起由 [MACHINE-MIGRATION-TASKS.md](MACHINE-MIGRATION-TASKS.md) 取代。下文验收记录均为历史记录。
 
 维护日期：2026-10-01。对应方案：[客户端与迁移方案](docs/desktop-client-plan.md)。

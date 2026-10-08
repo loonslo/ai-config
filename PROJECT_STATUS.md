@@ -1,13 +1,15 @@
 ---
 project_id: ai-config
-updated: 2026-10-02
-status: waiting
-overview: 当前转向离线换机迁移工具包，目标是备份并恢复 AI 助手配置、记忆和项目状态；旧桌面客户端及服务器同步方向已冻结。
+updated: 2026-10-08
+status: active
+overview: 桌面客户端为唯一用户入口，只保留 ZIP 原样备份、恢复、核验和撤销；云端继续冻结，不提供用户内容托管。
 progress: >-
-  2026-10-02 完成换机任务入口与旧方向冻结标记；MK-01 经当次授权分四个主题提交并推送到私有 wip/machine-kit-baseline。MK-02 本机 Python 3.14 核心回归 349 passed／2 skipped；首次跨平台 CI 因缺 tmp 目录未运行测试，修复待推送复测。P1 路径、分档、可选配置、zip 与夹具通过；MK-10 已授权只读核对 8/8 一致，另 7 个目录无对应键。P2/P3 已实现批准范围的采集、备份、恢复、核验、撤销、向导与启动器，WorkBuddy 保持手动候选。交付复查补齐专家采集排除与邮箱／URL 用户信息门禁，合并隔离测试 101 passed。首份 200 条快照曾获 M1 范围确认，但后续发现 4 个文件命中邮箱格式；另获本次 G3，从原 ZIP 既有快照生成 668504 B、196 条／11 项目的修正版，整体隐私检测 0 命中，原 ZIP 哈希不变，未重新读助手目录。历史基线差异按原快照记录；历史排除基线、U 盘、真实恢复与加载仍待验收。旧 DT 仅保留历史。
+  2026-10-08 已接入三页桌面流程与 machine 引擎，替换旧 .aiconfig 界面并拒绝旧云端及包操作；项目选择与映射、安全和信任确认、冲突另存、自动核验与撤销已实现。Windows Python 3.14 隔离相关回归 56 passed，前端构建和 lint、Windows sidecar 与 0.3.0 NSIS 构建通过，冻结 sidecar 在合成 HOME、无外置 Python/Git PATH 中完成备份到撤销全流程。上述不代表原生安装、窗口交互或真实跨机加载验收。2026-10-02 的隐私修正版备份及 101 项隔离测试属于历史记录，本次未刷新或恢复真实助手数据。
+  本日随后针对安装反馈修正宽屏根布局，加入检测超时重试和完整行响应兼容；5 个宽度与静默响应的浏览器夹具检查、前端构建和 0.3.1 NSIS 构建通过。用户确认 0.3.0 检查备份一直等待，复现外部 Git 继承请求输入管道的阻塞并以 DEVNULL 修复；相关 21 项回归及正常软件 PATH 的冻结 sidecar 全流程通过，0.3.2 Windows 安装包构建通过并保存发布清单。原生窗口与修复包升级仍待用户现场复测。
 next: >-
-  负责人明确暂时没有净室，等待 G8 环境后再做 MK-41／42，以隐私修正版作为演练输入。MK-28 真实双击另需 G3＋G2，目标写入须 G4，信任须 G5，新手试用须 G9。修复后的 CI 待授权推送；Claude Desktop 登记目录为空与 WorkBuddy 加载机制仍待核实。每次真机写入按对应门禁执行，结果先写任务与验收记录。
+  在净室验证 Windows 安装与三页窗口、选择器、ZIP 拖入、退出时写入保护及旧版本关联清理；再进行第二台电脑恢复、真实助手加载和新手试用，Mac 单独验收。云端保持冻结，旧命令脚本仅为历史开发兼容。结果先写当前离线任务与验收记录，再维护本摘要。
 evidence:
+  - tests/test_machine_process_input.py
   - MACHINE-MIGRATION-TASKS.md
   - sync_core/machine/privacy.py
   - tests/test_machine_privacy.py
@@ -113,7 +115,20 @@ evidence:
   - schemas/package.schema.json
   - tests/test_desktop_extensions.py
   - tests/test_cloud_core.py
+  - docs/desktop-offline-migration.md
+  - sync_core/application/machine_protocol.py
+  - tests/test_machine_desktop.py
+  - desktop/src/MachineApp.tsx
+  - desktop/src/Machine.css
+  - schemas/machine-desktop-rpc.schema.json
+  - desktop/vite.config.ts
+  - desktop/index.html
+  - desktop/tests/tauri-fixture.ts
 ---
+
+
+2026-10-08 维护：负责人澄清桌面客户端继续推进，只保留原样备份恢复 ZIP，云端继续冻结。本次实现、56 项相关回归、Windows 构建及冻结 sidecar 隔离演练结果见 docs/acceptance.md 与 docs/desktop-offline-migration.md。以下 2026-10-01／02 段落保留为历史，原生安装、真实跨机及加载未重新验收。本次未使用外部日常同步工具。
+
 
 # AI 配置同步 · 项目概览与进度
 
@@ -155,3 +170,9 @@ evidence:
 2026-10-02 P3：恢复向导与专家 CLI 等价验证完成，合并 91 项测试全部通过。当前等待 G8 净室进行真实演练；91 项自动测试不代表附录 B 签收、真实加载或零基础试用通过。净室准备清单仅记录准备步骤。未调用外部同步工具，未推送未授权分支。
 
 2026-10-02 交付复查：补齐配置排除与邮箱／URL 用户信息检测后合并 101 passed。首份 ZIP 的 4 个文本文件命中邮箱格式，原 M1 为历史范围确认，不能据此称原包隐私通过；另获本次 G3，从原包既有快照生成 196 条修正版并核对通过，未刷新源数据，原包哈希不变。负责人明确暂时没有净室，跟进状态改为 waiting；具体产物哈希、排除项及未验收边界见 acceptance。105 项证据路径及摘要字段本地自检通过，未使用外部日常同步工具。
+
+2026-10-08 交付前本地自检：必填和唯一字段、日期、跟进状态、非空摘要及 111 项稳定 evidence 路径通过；未使用外部日常库同步工具。发布清单与当前源码／安装包校验一致。这不改变原生安装、窗口交互和跨机加载仍未验收的边界。
+
+2026-10-08 安装反馈维护：OF-07 布局根因及通信假设纠正、已安装后端只读检测、浏览器夹具结果和 0.3.1 构建写入 acceptance。原生窗口截图超时，具体卡步骤和升级仍未验收，不将浏览器夹具当作真实窗口证据。
+
+2026-10-08 OF-08：用户补充 0.3.0 检查备份阶段一直等待，复现并修复外部探测继承持续打开的请求输入管道；21 项相关回归、无控制台管道回归复跑、正常 PATH 冻结 sidecar 全链通过，0.3.2 安装包构建完成。摘要契约和 115 项 evidence 路径本项目内自检通过，发布源文件及产物哈希一致；现场升级和跨机验收仍未完成。

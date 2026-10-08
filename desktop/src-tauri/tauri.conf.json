@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "AI Config",
-  "version": "0.2.0",
+  "version": "0.3.2",
   "identifier": "io.ai-config.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "AI Config · 本机配置客户端",
+        "title": "AI Config · 离线备份与恢复",
         "width": 940,
         "height": 700,
         "minWidth": 360,
@@ -34,26 +34,7 @@
       "binaries/ai-config-rpc"
     ],
     "resources": [
-      "../../schemas/desktop-rpc.schema.json",
-      "../../schemas/package.schema.json"
-    ],
-    "fileAssociations": [
-      {
-        "ext": [
-          "aiconfig"
-        ],
-        "name": "AI Config offline package",
-        "description": "AI Config offline migration package",
-        "role": "Viewer",
-        "rank": "Owner",
-        "exportedType": {
-          "identifier": "io.ai-config.offline-package",
-          "conformsTo": [
-            "public.data",
-            "public.archive"
-          ]
-        }
-      }
+      "../../schemas/machine-desktop-rpc.schema.json"
     ],
     "icon": [
       "icons/32x32.png",

@@ -12,7 +12,7 @@ fn take_open_package(state: State<'_, PendingOpenPackage>) -> Option<String> {
 
 fn package_argument(args: &[String]) -> Option<String> {
   args.iter()
-    .find(|argument| Path::new(argument).extension().is_some_and(|extension| extension.eq_ignore_ascii_case("aiconfig")))
+    .find(|argument| Path::new(argument).extension().is_some_and(|extension| extension.eq_ignore_ascii_case("zip")))
     .cloned()
 }
 

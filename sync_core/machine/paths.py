@@ -51,11 +51,11 @@ def git_root(path: str | os.PathLike[str]) -> Path:
     try:
         top = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"], cwd=folder, check=True,
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL,
         ).stdout.strip()
         common = subprocess.run(
             ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-            cwd=folder, check=True, capture_output=True, text=True, timeout=5,
+            cwd=folder, check=True, capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL,
         ).stdout.strip()
     except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return folder

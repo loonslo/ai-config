@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -603,8 +604,8 @@ def test_desktop_rpc_entrypoint_uses_utf8_json_lines_without_writing_preview(tmp
         "protocol_version": 1,
         "request_id": "import-preview",
         "type": "preview",
-        "operation": "import_config",
-        "params": {"source": str(source)},
+        "operation": "machine_detect",
+        "params": {},
     }
     root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
@@ -617,6 +618,9 @@ def test_desktop_rpc_entrypoint_uses_utf8_json_lines_without_writing_preview(tmp
             str(templates),
         ],
         input=json.dumps(request, ensure_ascii=False) + "\n",
+        env={**os.environ, 'AI_CONFIG_HOME': str(target.parent), 'USERPROFILE': str(tmp_path),
+             'HOME': str(tmp_path), 'CODEX_HOME': str(tmp_path / '.codex'),
+             'CLAUDE_CONFIG_DIR': str(tmp_path / '.claude')},
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -628,7 +632,8 @@ def test_desktop_rpc_entrypoint_uses_utf8_json_lines_without_writing_preview(tmp
     assert result.returncode == 0, result.stderr
     assert events[0]["type"] == "accepted"
     assert events[-1]["status"] == "preview"
-    assert events[-1]["result"]["written"] is False
+    assert events[-1]["can_apply"] is False
+    assert len(events[-1]["result"]["agents"]) == 4
     assert not target.exists()
 
 

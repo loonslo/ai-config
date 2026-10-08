@@ -1,5 +1,8 @@
 # AI Config desktop 0.2.0 preview
 
+> 当前入口（2026-10-08）：桌面客户端的备份、恢复与恢复记录；仅使用原样备份 ZIP。云端冻结，以下旧包与命令流程为历史参考。详见 [当前任务](../docs/desktop-offline-migration.md)。
+
+
 Tauri 2 + React/TypeScript/Vite desktop shell and bundled Python 3.14 sidecar. Users do not install Python or Git for local/offline actions. Native installation and agent loading remain separate acceptance items.
 
 Windows build from the repository root:
