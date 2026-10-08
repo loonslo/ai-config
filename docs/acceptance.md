@@ -581,3 +581,7 @@ desktop/.build-venv/Scripts/python.exe -m pytest -q tests/test_desktop_extension
 - `npm run build`、`npm run lint` 与 `npm run tauri:build` 通过，Rust 仍只有创建链接库／对象的 stdout 提示。Python 引擎未变化，前节 56 项回归为历史本日结果，本轮未重复。复用相同 sidecar 与依赖锁，无新增运行或测试依赖。
 - 新安装包：`release-artifacts/AI-Config-0.3.1-Windows-x64-setup.exe`，23877279 B，SHA-256 `b5df0e212962331a11a33929678a1c3b592554209249f5bb25057c4da4bb2f0d`。旧 0.3.0 包保留；NOTICES-full 沿用同依赖版权归档，发布清单单独记录当前源码及产物。未在用户机执行升级安装。
 - 原生限制：computer-use 能列出安装后的 AI Config 窗口并读到外层 accessibility，但 Windows 窗口截图两次超时；停止原生输入，没有用旧截图或盲点坐标操作。浏览器测试不能代替已安装 WebView、原生文件选择器和实际升级验收。未使用外部日常库，未推送。
+
+## 2026-10-09 GitHub 下载链接 404 修复
+
+用户反馈安装包链接 404。核对发现仓库公开、`v0.3.2` Git 标签仍指向提交 `ad686d888b7ab091194f644ddc0e09447fe9f943`，但该标签对应的 GitHub Release 记录不存在。以保留的标签重建预发布，重新上传 Windows x64 安装包；GitHub 资产摘要为 `sha256:8701613747a6f4b22187c65202c0628451fa4b4fca9b662f88d30d493ac7e1e0`。匿名执行 `curl.exe -I -L` 跟随重定向后返回 **200 OK**、Content-Length **23,880,226**，下载地址现已恢复。Release 页面：[v0.3.2](https://github.com/loonslo/ai-config/releases/tag/v0.3.2)。Release 记录之前为何消失无法从当前证据确定。
