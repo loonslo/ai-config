@@ -914,3 +914,5 @@ Windows / Python 3.14：完整 pytest 使用全新 tmp/audit-20261015-02，735 p
 ### 2026-10-15 云端跨平台结果
 
 补齐依赖后 GitHub Actions run 38707301357：macOS core/frozen 均失败，其中 frozen 为 18 failed、724 passed；Windows 两项因矩阵 fail-fast 被取消。失败涉及 Windows 路径夹具、项目 MCP/信任映射、大小写记忆目录、junction 调用 cmd 与启动器路径，不能宣称跨平台验收通过。保留测试和错误，不用跳过掩盖；这些跨平台修复超出本轮提交与服务器发布范围，未发新版安装包。后续仅关闭矩阵 fail-fast，保留各系统独立结果，避免 macOS 失败取消 Windows 证据。
+
+2026-10-15 run 38707799339 已收齐：Windows core 为1失败/736通过/1跳过，frozen为1失败/741通过；唯一失败是包示例.bin在Git自动换行后哈希失配，本机原样字节未复现。已在.gitattributes把.bin声明为非文本，保留包字节和安全完整性校验，不修改manifest或降低校验。macOS仍为18项失败（core719通过/1跳过，frozen724通过），不宣称跨平台可用。
