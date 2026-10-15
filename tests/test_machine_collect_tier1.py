@@ -64,7 +64,7 @@ def test_source_verification_detects_later_edits(tmp_path):
     assert not result.verify_sources_unchanged()
 
 
-def test_secret_hit_memory_is_excluded_without_reading_link_target(tmp_path, monkeypatch):
+def test_secret_hit_memory_is_redacted_without_reading_link_target(tmp_path, monkeypatch):
     paths = build_machine_home(tmp_path / "home")
     config = _config(tmp_path, paths)
     memory = next((paths["home"] / ".claude" / "projects").glob("*/memory"))
@@ -79,7 +79,8 @@ def test_secret_hit_memory_is_excluded_without_reading_link_target(tmp_path, mon
     writer = BundleWriter(tmp_path / "safe.zip")
     result = collect_tier1(writer, home=paths["home"], config=config, environ={}, os_name="windows")
     writer.finalize(exclusions=result.exclusions)
-    assert any(item["reason"] == "secret_hit" for item in result.exclusions)
-    assert all("private.md" not in entry["archive_path"] for entry in writer.entries)
+    assert any(item["action"] == "redacted" for item in writer.flagged)
+    assert all(("x" * 24).encode() not in data for data in writer._files.values())
+    assert any("private.md" in entry["archive_path"] for entry in writer.entries)
     assert tracker.touched([paths["home"] / ".claude" / ".credentials.json"]) == []
     assert_no_sentinel(tmp_path / "safe.zip")

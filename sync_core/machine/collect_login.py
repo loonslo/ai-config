@@ -4,24 +4,20 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import re
-import subprocess
 from typing import Mapping
 from urllib.parse import urlsplit
 
 from .bundle import BundleWriter
 from .collect_reinstall import _ENV, _json, _toml
+from .privacy import secret_name
 
 
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
 
 
 def _git_credential_keys() -> list[str]:
-    try:
-        result = subprocess.run(("git", "config", "--global", "--name-only", "--get-regexp", r"^credential\."),
-                                capture_output=True, text=True, timeout=5, check=False, stdin=subprocess.DEVNULL)
-        return result.stdout.splitlines()[:1000] if result.returncode == 0 else []
-    except (OSError, subprocess.TimeoutExpired):
-        return []
+    """Legacy helper: Git credentials are never inspected."""
+    return []
 
 
 def _credential_hosts(keys: list[str]) -> list[str]:
@@ -58,7 +54,7 @@ def login_checklist(*, home: Path, environ: Mapping[str, str] | None = None,
         variables = settings.get("env", {})
         if isinstance(variables, dict):
             for key in sorted(variables):
-                if isinstance(key, str) and _ENV.fullmatch(key):
+                if isinstance(key, str) and _ENV.fullmatch(key) and secret_name(key):
                     lines.append(f"- Claude 环境变量 `{key}`：从原服务控制台或个人安全存储重新填写。")
     if "codex" in agents:
         root = Path(env.get("CODEX_HOME", str(home / ".codex")))
@@ -69,15 +65,10 @@ def login_checklist(*, home: Path, environ: Mapping[str, str] | None = None,
         variables = shell.get("set", {}) if isinstance(shell, dict) else {}
         if isinstance(variables, dict):
             for key in sorted(variables):
-                if isinstance(key, str) and _ENV.fullmatch(key):
+                if isinstance(key, str) and _ENV.fullmatch(key) and secret_name(key):
                     lines.append(f"- Codex 环境变量 `{key}`：从原服务控制台或个人安全存储重新填写。")
     if (home / ".cc-switch").exists() and "claude" in agents:
         lines.append("- CC Switch 服务配置：在新机器重新添加服务提供方，并从各服务控制台取得凭据；本备份不含其数据库或设置。")
-    credential_keys = _git_credential_keys() if git_keys is None else git_keys
-    if credential_keys or (home / ".git-credentials").exists():
-        lines.append("- Git 凭据管理器：在新机器重新认证；不要复制凭据文件。")
-        for host in _credential_hosts(credential_keys):
-            lines.append(f"- Git 主机 `{host}`：到该主机账户安全设置重新授权。")
     ssh = home / ".ssh"
     if ssh.is_dir() and not ssh.is_symlink() and any(
         path.is_file() and not path.is_symlink() and

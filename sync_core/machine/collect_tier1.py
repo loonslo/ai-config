@@ -12,7 +12,6 @@ import tomllib
 from typing import Any, Iterator, Mapping
 
 from sync_core.rules_text import normalize, split_lines
-from sync_core.utils import SECRET
 
 from .bundle import BundleError, BundleWriter, MAX_FILE_BYTES
 from .catalog import (
@@ -21,7 +20,8 @@ from .catalog import (
 )
 from .config import MachineConfig, load_config,excluded_path
 from .paths import derive_project_dir, git_root, norm
-from .privacy import personal_text, private_text
+from .coverage import Ledger, observe_fields
+from .settings import CLAUDE_CONFIRM_EXTRA, clean_mcp_servers, field_names, safe_environment
 
 _ABSOLUTE = re.compile(r"(?i)(?:\b[A-Z]:[\\/]|(?<!\w)/(?:Users|home|workspace|Volumes)/)")
 
@@ -33,6 +33,11 @@ class CollectionResult:
     files_by_kind: dict[str, int] = field(default_factory=dict)
     project_ids: list[str] = field(default_factory=list)
     source_fingerprints: dict[Path, tuple[str, int, Path]] = field(default_factory=dict, repr=False)
+    field_ledger: Ledger = field(default_factory=Ledger, repr=False)
+    coverage_origins: dict[Path, str] = field(default_factory=dict, repr=False)
+    coverage_logical: dict[Path, str] = field(default_factory=dict, repr=False)
+    approved_links: dict[Path, Path] = field(default_factory=dict, repr=False)
+    coverage_issues: dict[str, set[str]] = field(default_factory=dict, repr=False)
 
     def verify_sources_unchanged(self) -> bool:
         """Re-read only sources already touched by this collector."""
@@ -67,10 +72,8 @@ def _read(path: Path, boundary: Path) -> bytes:
     if not path.is_relative_to(boundary):
         raise BundleError("source is outside approved root")
     for candidate in (path, *path.parents):
-        if candidate.is_symlink():
+        if candidate.is_symlink() or candidate.is_junction():
             raise BundleError("symbolic link in source path")
-        if candidate == boundary:
-            break
     before = path.stat()
     if before.st_size > MAX_FILE_BYTES:
         raise BundleError("source file exceeds size limit")
@@ -117,7 +120,7 @@ def _add_whole(writer: BundleWriter, result: CollectionResult, *, agent: str, so
                archive_relative: str | None = None,
                allow_secret_hit_paths: frozenset[Path] = frozenset()) -> None:
     item = allowed_item(agent, "main", relative)
-    if item is None:
+    if item is None or not writer.wants(item.kind):
         return
     logical = f"{agent}:main/{relative}"
     try:
@@ -135,9 +138,14 @@ def _add_whole(writer: BundleWriter, result: CollectionResult, *, agent: str, so
         result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "non_text", "size": len(data),
                                   "sha256": hashlib.sha256(data).hexdigest()})
         return
-    if personal_text(data) or (SECRET.search(data.decode("utf-8", errors="replace")) and source not in allow_secret_hit_paths):
-        result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "secret_hit"})
+    data, privacy_flags = writer.prepare_content(data, logical_path=logical, rule_id=item.rule_id,
+                                                format_hint=source.suffix.casefold(),
+                                                allow_secret=source in allow_secret_hit_paths)
+    if data is None:
+        result.exclusions.append({"logical_path": logical, "source_path": str(source),
+                                  "reason": "secret_hit" if writer.flagged_policy == "skip" else "skipped_by_policy"})
         return
+    flags.extend(privacy_flags)
     archive_path = (f"files/{agent}/main/{relative}" if project is None
                     else f"files/projects/{project}/claude/memory/{archive_relative or source.name}")
     try:
@@ -151,6 +159,8 @@ def _add_whole(writer: BundleWriter, result: CollectionResult, *, agent: str, so
 
 def _fields(writer: BundleWriter, result: CollectionResult, *, agent: str, source: Path, root: Path,
             selected_desktop: frozenset[str], os_name: str) -> None:
+    if not writer.wants('settings_fields'):
+        return
     if not source.is_file() or source.is_symlink():
         return
     try:
@@ -159,6 +169,7 @@ def _fields(writer: BundleWriter, result: CollectionResult, *, agent: str, sourc
         raw = json.loads(data) if agent == "claude" else tomllib.loads(data.decode("utf-8"))
         if not isinstance(raw, dict):
             raise ValueError("settings root must be an object")
+        observe_fields(raw, root=f"{agent}_home", source=source.name, ledger=result.field_ledger)
     except (OSError, BundleError, ValueError, UnicodeError):
         result.warnings.append({"code": "E7102", "message": "无法安全读取设置白名单字段"})
         return
@@ -175,6 +186,17 @@ def _fields(writer: BundleWriter, result: CollectionResult, *, agent: str, sourc
                 picked[key] = raw[key]
                 names.append(key)
                 confirm.append(key)
+        environment = safe_environment(raw.get('env'))
+        if environment:
+            picked['env'] = environment
+            confirm.extend('env.' + key for key in environment)
+        for key in CLAUDE_CONFIRM_EXTRA:
+            if key not in raw:
+                continue
+            value = clean_mcp_servers(raw[key]) if key == 'mcpServers' else raw[key]
+            if value:
+                picked[key] = value
+                confirm.extend(field_names({key: value}))
         filename = "settings.fields.json"
         logical = "claude:main/settings.json"
     else:
@@ -202,8 +224,21 @@ def _fields(writer: BundleWriter, result: CollectionResult, *, agent: str, sourc
                 picked[key] = raw[key]
                 names.append(key)
                 confirm.append(key)
+        shell = raw.get('shell_environment_policy', {})
+        environment = safe_environment(shell.get('set')) if isinstance(shell, dict) else {}
+        if environment:
+            picked['shell_environment_policy'] = {'set': environment}
+            confirm.extend('shell_environment_policy.set.' + key for key in environment)
+        servers = raw.get('mcp_servers', {})
+        remote = {name: server for name, server in servers.items()
+                  if isinstance(name, str) and '.' not in name and isinstance(server, dict)
+                  and set(server) == {'url'} and isinstance(server['url'], str)} if isinstance(servers, dict) else {}
+        if remote:
+            picked['mcp_servers'] = remote
+            confirm.extend('mcp_servers.' + key + '.url' for key in remote)
         filename = "config.fields.json"
         logical = "codex:main/config.toml"
+    names = field_names(picked)
     if not names:
         return
     try:
@@ -211,18 +246,19 @@ def _fields(writer: BundleWriter, result: CollectionResult, *, agent: str, sourc
     except (TypeError, ValueError):
         result.warnings.append({"code": "E7103", "message": "所选设置字段无法安全编码"})
         return
-    if private_text(derived):
-        result.exclusions.append({"logical_path": logical, "reason": "secret_hit"})
+    derived, privacy_flags = writer.prepare_content(derived, logical_path=logical, format_hint=".json")
+    if derived is None:
+        result.exclusions.append({"logical_path": logical, "reason": "secret_hit" if writer.flagged_policy == "skip" else "skipped_by_policy"})
         return
     writer.add_file(f"files/{agent}/main/{filename}", derived, agent=agent, instance="main",
                     kind="settings_fields", mode="fields", logical_path=logical,
-                    fields=sorted(names), confirm_fields=sorted(confirm))
+                    fields=sorted(names), confirm_fields=sorted(confirm), flags=privacy_flags)
     result.files_by_kind["settings_fields"] = result.files_by_kind.get("settings_fields", 0) + 1
 
 
 def collect_tier1(writer: BundleWriter, *, home: Path, config: MachineConfig | None = None,
                   environ: Mapping[str, str] | None = None, agents: frozenset[str] = frozenset({"claude", "codex"}),
-                  os_name: str | None = None) -> CollectionResult:
+                  os_name: str | None = None, collect_skills: bool = True) -> CollectionResult:
     """Never read credentials, login state, session DBs, or WorkBuddy drafts."""
     env = os.environ if environ is None else environ
     selected = config or load_config(home=home)
@@ -285,7 +321,7 @@ def collect_tier1(writer: BundleWriter, *, home: Path, config: MachineConfig | N
             if not excluded(root/'config.toml',root):
                 _fields(writer, result, agent=agent, source=root / "config.toml", root=root,
                         selected_desktop=selected.include_desktop_fields, os_name=system)
-            for source in _files_below(root / "skills",excluded=lambda path:excluded(path,root)):
+            for source in (_files_below(root / "skills",excluded=lambda path:excluded(path,root)) if collect_skills else ()):
                 relative = source.relative_to(root).as_posix()
                 _add_whole(writer, result, agent=agent, source=source, boundary=root, relative=relative,
                            allow_secret_hit_paths=selected.allow_secret_hit_paths)

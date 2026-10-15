@@ -6,8 +6,6 @@ import os
 from pathlib import Path
 from typing import Iterator, Mapping
 
-from .privacy import private_text
-
 from .bundle import BundleWriter
 from .catalog import allowed_item, denied_path
 from .collect_projects import _key, _owner
@@ -57,7 +55,7 @@ def _add(writer: BundleWriter, result: CollectionResult, *, source: Path, bounda
          relative: str, archive: str, instance: str, scope: str, pid: str | None,
          logical_relative: str | None = None) -> None:
     item = allowed_item(instance, instance, relative, scope=scope)
-    if item is None:
+    if item is None or not writer.wants(item.kind):
         return
     if item.kind == "memory" and source.suffix.casefold() != ".md":
         return
@@ -80,17 +78,20 @@ def _add(writer: BundleWriter, result: CollectionResult, *, source: Path, bounda
     if text is None:
         result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "non_text", "size": len(data), "sha256": digest})
         return
-    if private_text(text):
-        result.exclusions.append({"logical_path": logical, "source_path": str(source), "reason": "secret_hit"})
+    data, privacy_flags = writer.prepare_content(data, logical_path=logical, rule_id=item.rule_id,
+                                                format_hint=source.suffix.casefold())
+    if data is None:
+        result.exclusions.append({"logical_path": logical, "source_path": str(source),
+                                  "reason": "secret_hit" if writer.flagged_policy == "skip" else "skipped_by_policy"})
         return
     writer.add_file(archive, data, agent=instance, instance=instance, kind=item.kind,
-                    logical_path=logical, project_id=pid, restore="manual", flags=_flags(data, rules=False))
+                    logical_path=logical, project_id=pid, restore="manual", flags=_flags(data, rules=False) + privacy_flags)
     result.files_by_kind[item.kind] = result.files_by_kind.get(item.kind, 0) + 1
 
 
 def collect_workbuddy(writer: BundleWriter, *, home: Path, config: MachineConfig,
                       agents: frozenset[str] = frozenset(_INSTANCES),
-                      environ: Mapping[str, str] | None = None, os_name: str = "windows") -> CollectionResult:
+                      environ: Mapping[str, str] | None = None, os_name: str = "windows", collect_skills: bool = True) -> CollectionResult:
     """Never open settings, account state, credentials, migration markers or DBs."""
     env = os.environ if environ is None else environ
     result = CollectionResult()
@@ -114,7 +115,7 @@ def collect_workbuddy(writer: BundleWriter, *, home: Path, config: MachineConfig
             if source.is_file() and not source.is_symlink():
                 _add(writer, result, source=source, boundary=root, relative=name,
                      archive=f"files/{instance}/{instance}/{name}", instance=instance, scope="agent", pid=None)
-        for branch in ("memory", "skills"):
+        for branch in (("memory", "skills") if collect_skills else ("memory",)):
             for source in _files(root / branch,excluded=lambda path:excluded(path,root)):
                 relative = source.relative_to(root).as_posix()
                 _add(writer, result, source=source, boundary=root, relative=relative,
@@ -131,7 +132,7 @@ def collect_workbuddy(writer: BundleWriter, *, home: Path, config: MachineConfig
             visited.add(identity)
             pid = project_id(project, os_name)
             for folder in _project_roots(project, instance,excluded=excluded):
-                for branch in ("memory", "skills"):
+                for branch in (("memory", "skills") if collect_skills else ("memory",)):
                     for source in _files(folder / branch,excluded=lambda path:excluded(path,project)):
                         if _owner(str(source), config.core_projects, os_name) != _owner(str(project), config.core_projects, os_name):
                             continue

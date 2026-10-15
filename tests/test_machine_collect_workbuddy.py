@@ -34,5 +34,6 @@ def test_approved_workbuddy_text_only_and_protected_zero_reads(tmp_path, monkeyp
     assert any(item["kind"] == "persona" for item in manifest["entries"])
     assert any(item["project_id"] for item in manifest["entries"])
     assert any(item["reason"] == "non_text" for item in result.exclusions)
-    assert any(item["reason"] == "secret_hit" for item in result.exclusions)
+    assert any(item["action"] == "redacted" for item in writer.flagged)
+    assert all(("x" * 24).encode() not in data for data in writer._files.values())
     assert not any("AGENTS.md" in item["archive_path"] for item in manifest["entries"])

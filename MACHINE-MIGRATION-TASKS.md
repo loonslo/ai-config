@@ -1,5 +1,7 @@
 # 换机迁移工具包 · 实施任务（MACHINE-MIGRATION-TASKS）
 
+> 2026-10-09 同步范围修订：带什么、如何定性、隐私处理与后续实现顺序以 [同步分类规范](docs/machine-sync-classification.md)、[变更方案](docs/machine-sync-plan.md)、[接口契约](docs/machine-sync-interfaces.md) 为准。旧红线中的邮箱内容门禁、第三方技能只记录、11 个核心项目、链接与历史规则的具体取代关系见新分类规范 §6。新实现逐项验证进度见 [执行记录](docs/machine-sync-execution.md)，不能把设计决定视为已实现功能。
+
 > 当前决策（2026-10-08）：桌面客户端恢复推进，只保留原样备份恢复 ZIP；云端继续冻结，命令向导不作为用户入口。以下旧冻结范围及旧 `.aiconfig`／终端交付任务属于历史记录，与本声明冲突处以 [桌面离线迁移任务](docs/desktop-offline-migration.md) 为准。
 
 
@@ -872,3 +874,7 @@ python scripts/machine.py guide     restore [备份文件]
 - Claude Code：记忆 https://code.claude.com/docs/en/memory ；会话 https://code.claude.com/docs/en/sessions ；权限与工作区信任 https://code.claude.com/docs/en/permissions ；设置 https://code.claude.com/docs/en/settings ；目录说明 https://code.claude.com/docs/en/claude-directory ；hooks https://code.claude.com/docs/en/hooks
 - Codex：AGENTS.md 指南 https://developers.openai.com/codex/guides/agents-md ；高级配置（含项目信任） https://developers.openai.com/codex/config-advanced ；CLI 功能（`codex resume`） https://developers.openai.com/codex/cli/features
 - CC Switch：README https://github.com/farion1231/cc-switch
+
+## 2026-10-15 提交核对
+
+完整 Python 3.14 回归 735 通过、3 跳过，桌面构建/lint 与凭据扫描通过；原生与跨机验收边界见 docs/acceptance.md 本日记录。

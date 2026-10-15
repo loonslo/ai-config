@@ -5,7 +5,6 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import re
-import subprocess
 
 
 def _windows(os_name: str) -> bool:
@@ -44,25 +43,11 @@ def derive_project_dir(native_path: str | os.PathLike[str]) -> str | None:
 
 
 def git_root(path: str | os.PathLike[str]) -> Path:
-    """Return the primary checkout for a worktree, otherwise its Git root."""
+    """Legacy name: use the selected folder without inspecting Git metadata."""
     folder = Path(path).resolve()
     if not folder.is_dir():
         folder = folder.parent
-    try:
-        top = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"], cwd=folder, check=True,
-            capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL,
-        ).stdout.strip()
-        common = subprocess.run(
-            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-            cwd=folder, check=True, capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL,
-        ).stdout.strip()
-    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        return folder
-    common_path = Path(common)
-    if common_path.name == ".git" and common_path.parent.is_dir():
-        return common_path.parent.resolve()
-    return Path(top).resolve()
+    return folder
 
 
 @dataclass(frozen=True)

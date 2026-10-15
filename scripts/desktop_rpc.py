@@ -22,10 +22,11 @@ def main() -> None:
     parser.add_argument("--local", type=Path, default=None, help="device configuration path")
     parser.add_argument("--template-root", type=Path, default=ROOT, help="read-only bundled template directory")
     args = parser.parse_args()
-    for stream in (sys.stdout, sys.stderr):
+    # Tauri writes UTF-8 JSON regardless of the Windows pipe locale.
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
         if not stream.isatty():
             try:
-                stream.reconfigure(encoding="utf-8", errors="replace")
+                stream.reconfigure(encoding="utf-8", errors="strict" if stream is sys.stdin else "replace")
             except (AttributeError, OSError, ValueError):
                 pass
     MachineProtocol(

@@ -36,7 +36,7 @@ def test_reinstall_report_never_copies_values_or_skill_content(tmp_path, monkeyp
     assert tracker.touched([path for path in paths["protected"] if path != settings]) == []
     assert_tree_unchanged(before, home)
     assert len(inventory["cc_switch_skills"]) == 1
-    assert inventory["cc_switch_skills"][0]["remote"] == "https://example.org/review"
+    assert set(inventory["cc_switch_skills"][0]) == {'name', 'bytes'}
     assert inventory["codex_mcp_servers"][0]["args_count"] == 1
     assert inventory["codex_mcp_servers"][0]["env_keys"] == ["API_TOKEN"]
     writer = BundleWriter(tmp_path / "reinstall.zip")

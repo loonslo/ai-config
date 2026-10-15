@@ -19,12 +19,19 @@ from sync_core.machine.collect_records import software_inventory
 from sync_core.machine.backup import validate_output, agent_roots
 from sync_core.layout import default_state_path
 from sync_core.messages import Message
+from sync_core.machine.privacy import public_value
+
+
+def _emit(value, *, as_json: bool = False, sort_keys: bool = False, file=None) -> None:
+    """Sanitize a display copy before serialization; never change synced bytes."""
+    safe = public_value(value)
+    print(json.dumps(safe, ensure_ascii=False, sort_keys=sort_keys) if as_json else safe, file=file)
 
 
 def _failure(code: str, what: str, next_step: str, *, as_json: bool, exit_code: int = 1,
              preserved: str = "本机助手文件未被改写；已存在的备份保留。") -> int:
     message = Message(code, what, preserved, next_step, exit_code=exit_code)
-    print(json.dumps(message.as_json(), ensure_ascii=False) if as_json else "\n".join(message.lines()), file=sys.stderr)
+    _emit(message.as_json() if as_json else "\n".join(message.lines()), as_json=as_json, file=sys.stderr)
     return exit_code
 
 
@@ -118,14 +125,14 @@ def main(argv: list[str] | None = None) -> int:
             state = default_state_path()
             if args.index is None and args.operation_id is None:
                 choices = operations(state)
-                print(json.dumps(choices, ensure_ascii=False) if args.json else
-                      "\n".join(f"{index}. {item['created_at']}，涉及 {item['change_count']} 个文件。" for index,item in enumerate(choices,1)))
+                _emit(choices if args.json else
+                      "\n".join(f"{index}. {item['created_at']}，涉及 {item['change_count']} 个文件。" for index,item in enumerate(choices,1)), as_json=args.json)
                 return 2 if choices else 0
             config = load_config()
             report = undo_machine(state, index=args.index, operation_id=args.operation_id, apply=args.apply,
                                   process_names=config.running_process_names)
-            print(json.dumps(report, ensure_ascii=False) if args.json else
-                  f"{'已撤销' if args.apply else '将撤销'} {report['writes']} 个文件；后续修改会受到保护。")
+            _emit(report if args.json else
+                  f"{'已撤销' if args.apply else '将撤销'} {report['writes']} 个文件；后续修改会受到保护。", as_json=args.json)
             return 0 if args.apply or not report['writes'] else 3
         except (OSError, ValueError, RuntimeError):
             return _failure("E7412", "无法安全撤销这次恢复。", "核对文件是否有后续修改，并关闭助手后重试。", as_json=args.json,
@@ -157,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
                                              projects=tuple(path for path in result.projects.values() if path is not None))
                     with (output / "verify-report.md").open("x", encoding="utf-8") as handle:
                         handle.write(verification.markdown())
-                print(json.dumps(verification.report(), ensure_ascii=False) if args.json else verification.markdown())
+                _emit(verification.report() if args.json else verification.markdown(), as_json=args.json)
                 return verification.exit_code
             if args.command == "restore":
                 from sync_core.machine.apply import plan_restore, apply_restore
@@ -167,8 +174,8 @@ def main(argv: list[str] | None = None) -> int:
                                     codex_trust=args.codex_trust, confirm_trust=args.confirm_trust,
                                     workbuddy_files=args.workbuddy_files)
                 report = apply_restore(plan) if args.apply else plan.report()
-                print(json.dumps(report, ensure_ascii=False, sort_keys=True) if args.json else
-                      f"{'已处理' if args.apply else '检查完成'}：新增或调整 {report['writes']} 个文件，内容不同 {len(report['conflicts'])} 项，跳过 {len(report['skipped'])} 项。原有版本按冲突选择保留，写入前均有备份。")
+                _emit(report if args.json else
+                      f"{'已处理' if args.apply else '检查完成'}：新增或调整 {report['writes']} 个文件，内容不同 {len(report['conflicts'])} 项，跳过 {len(report['skipped'])} 项。原有版本按冲突选择保留，写入前均有备份。", as_json=args.json, sort_keys=True)
                 return 4 if report['conflicts'] or report['skipped'] or result.running else 3 if not args.apply and plan.changes else 0
             if args.out_dir is not None:
                 output = validate_output(args.out_dir, roots=tuple(agent_roots(home, config, os.environ).values()),
@@ -176,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
                 for name, text in (("preflight-report.md", result.markdown()), ("todo.md", result.todo())):
                     with (output / name).open("x", encoding="utf-8") as handle:
                         handle.write(text)
-            print(json.dumps(result.report(), ensure_ascii=False, sort_keys=True) if args.json else result.markdown())
+            _emit(result.report() if args.json else result.markdown(), as_json=args.json, sort_keys=True)
             counts = result.report()["counts"]
             return 4 if result.running or counts.get("differs") or counts.get("blocked") or result.security_list or result.trust_list else 3 if counts.get("new") else 0
         except (OSError, ValueError, KeyError, TypeError, RuntimeError):
@@ -188,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError, json.JSONDecodeError):
             print("无法核对路径：本机项目登记无法安全读取；没有改动任何文件。", file=sys.stderr)
             return 1
-        print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+        _emit(report, as_json=True, sort_keys=True)
         return 0
     if args.command == "backup":
         if args.apply and args.out is None:
@@ -205,12 +212,12 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError):
             return _failure("E7403", "无法安全完成备份采集或发布。", "核对配置、保存目录和源文件；关闭正在修改配置的助手后重试。", as_json=args.json)
         if args.json:
-            print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+            _emit(report, as_json=True, sort_keys=True)
         else:
-            print(f"{'备份已保存' if args.apply else '备份预览'}：{report['destination']}")
+            _emit(f"{'备份已保存' if args.apply else '备份预览'}：{report['destination']}")
             print(f"条目 {report['entries']}；项目 {report['projects']}；排除 {len(report['exclusions'])}；提醒 {len(report['warnings'])}。")
             for item in report["exclusions"]:
-                print(f"未备份 {item['reason']}：{item['logical_path']}")
+                _emit(f"未备份 {item['reason']}：{item['logical_path']}")
             if args.apply:
                 print(f"SHA-256：{report['sha256']}")
             else:

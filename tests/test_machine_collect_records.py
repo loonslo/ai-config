@@ -17,3 +17,5 @@ def test_software_inventory_uses_injected_offline_commands(tmp_path):
     assert report["codex_desktop_version"] is None
     assert report["symlinks_supported"] is False
     assert ("npm", "ls", "-g", "--depth=0", "--json") in seen
+    assert not any(command[0] == 'git' for command in seen)
+    assert 'git' not in report['versions'] and 'git_lfs' not in report['versions']

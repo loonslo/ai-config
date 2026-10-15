@@ -386,7 +386,8 @@
                             "codex",
                             "claude",
                             "workbuddy",
-                            "workbuddy-ai"
+                            "workbuddy-ai",
+                            "shared"
                           ]
                         }
                       },
@@ -396,6 +397,15 @@
                           "type": "string",
                           "minLength": 1
                         }
+                      },
+                      "groups": {
+                        "$ref": "#/$defs/contentGroups"
+                      },
+                      "flagged_policy": {
+                        "enum": [
+                          "redact",
+                          "skip"
+                        ]
                       }
                     }
                   }
@@ -435,7 +445,8 @@
                             "codex",
                             "claude",
                             "workbuddy",
-                            "workbuddy-ai"
+                            "workbuddy-ai",
+                            "shared"
                           ]
                         }
                       },
@@ -468,6 +479,24 @@
                       },
                       "workbuddy_files": {
                         "type": "boolean"
+                      },
+                      "conflict_choices": {
+                        "type": "object",
+                        "maxProperties": 20000,
+                        "propertyNames": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "additionalProperties": {
+                          "enum": [
+                            "overwrite",
+                            "keep"
+                          ]
+                        }
+                      },
+                      "groups": {
+                        "$ref": "#/$defs/contentGroups"
                       }
                     }
                   }
@@ -509,6 +538,22 @@
           ]
         }
       ]
+    },
+    "contentGroups": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "rules",
+          "memory",
+          "skills_own",
+          "skills_third",
+          "approvals",
+          "settings",
+          "history"
+        ]
+      }
     }
   }
 }

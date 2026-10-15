@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.3.2"
+version = "0.3.7"
 description = "AI Config desktop client"
 edition = "2024"
 rust-version = "1.90"

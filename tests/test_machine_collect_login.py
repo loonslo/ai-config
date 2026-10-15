@@ -25,7 +25,7 @@ def test_login_checklist_uses_names_only_and_does_not_open_secrets(tmp_path, mon
     assert_tree_unchanged(before, home)
     assert SENTINEL not in report
     assert "API_TOKEN" in report and "SERVICE_KEY" in report
-    assert "github.com" in report and "accounts.example.org" in report
+    assert "github.com" not in report and "accounts.example.org" in report
     assert "`helper`" not in report
     assert "SSH 私钥" in report and "WorkBuddy" in report
     writer = BundleWriter(tmp_path / "login.zip")

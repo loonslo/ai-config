@@ -1,11 +1,19 @@
 :root {
-  --font-ui: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
-  --text-small: .875rem;
-  --text-body: 1rem;
-  --text-heading: 1.125rem;
+  --font-ui: 'Segoe UI Variable', 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
+  --text-small: .8125rem;
+  --text-body: .9375rem;
+  --text-heading: 1.0625rem;
+  --canvas: #f3f5f9;
+  --surface: #ffffff;
+  --ink: #243044;
+  --muted: #647187;
+  --line: #e2e7ef;
+  --accent: #4265ce;
+  --accent-soft: #f0f4ff;
+  --rail: #202c40;
   font-family: var(--font-ui);
-  color: #e8edf4;
-  background: #101419;
+  color: var(--ink);
+  background: var(--canvas);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -14,11 +22,11 @@
   font-weight: 400;
   font-size: 16px;
   line-height: 1.6;
-  color-scheme: dark;
+  color-scheme: light;
   font-feature-settings: 'ss01' on;
 }
 
 * { box-sizing: border-box; }
 
-body { margin: 0; min-width: 360px; min-height: 100vh; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
 button { font: inherit; }

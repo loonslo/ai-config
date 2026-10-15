@@ -6,7 +6,6 @@ import ntpath
 import os
 from pathlib import Path
 import re
-import subprocess
 import tomllib
 from typing import Any, Mapping
 from urllib.parse import urlsplit
@@ -71,28 +70,14 @@ def _program(raw: Any) -> str | None:
     return name if _NAME.fullmatch(name) else None
 
 
-def _git(skill: Path) -> tuple[bool, str | None, str | None]:
-    if not (skill / ".git").exists():
-        return False, None, None
-    def run(*args: str) -> str | None:
-        try:
-            result = subprocess.run(("git", "-C", str(skill), *args), capture_output=True,
-                                    text=True, timeout=5, check=False, stdin=subprocess.DEVNULL)
-            return result.stdout.strip() if result.returncode == 0 else None
-        except (OSError, subprocess.TimeoutExpired):
-            return None
-    head = run("rev-parse", "HEAD")
-    if head is not None and not re.fullmatch(r"[a-fA-F0-9]{40,64}", head):
-        head = None
-    return True, _safe_url(run("config", "--get", "remote.origin.url")), head
-
-
 def _size(folder: Path) -> int:
     total = 0
     for current, directories, files in os.walk(folder, followlinks=False):
         parent = Path(current)
-        directories[:] = [name for name in directories if name != ".git" and not (parent / name).is_symlink()]
+        directories[:] = [name for name in directories if name.casefold() != ".git" and not (parent / name).is_symlink()]
         for name in files:
+            if name.casefold() in {'.git', '.gitconfig', '.git-credentials', '.gitignore', '.gitattributes', '.gitmodules'}:
+                continue
             source = parent / name
             if not source.is_symlink():
                 try:
@@ -108,11 +93,11 @@ def _cc_skills(home: Path) -> list[dict[str, Any]]:
         return []
     result = []
     for skill in sorted(root.iterdir(), key=lambda item: item.name.casefold()):
+        if skill.name.casefold() == '.git':
+            continue
         if not skill.is_dir() or skill.is_symlink() or not _NAME.fullmatch(skill.name):
             continue
-        is_git, remote, head = _git(skill)
-        result.append({"name": skill.name, "git": is_git, "remote": remote,
-                       "head": head, "bytes": _size(skill)})
+        result.append({"name": skill.name, "bytes": _size(skill)})
     return result
 
 
@@ -202,7 +187,7 @@ def add_reinstall_reports(writer: BundleWriter, inventory: dict[str, Any]) -> No
               f"- Codex MCP 服务器：{len(inventory['codex_mcp_servers'])} 个。",
               "- WorkBuddy：按已批准分档手动恢复文本，插件重新安装。", ""]
     for skill in inventory["cc_switch_skills"]:
-        lines.append(f"- CC Switch skill `{skill['name']}`：{skill['bytes']} B；来源 {skill['remote'] or '未记录'}；commit {skill['head'] or '未记录'}。")
+        lines.append(f"- CC Switch skill `{skill['name']}`：{skill['bytes']} B；请按技能来源说明重新安装。")
     for label, key in (("Claude 插件", "claude_enabled_plugins"), ("Claude marketplace", "claude_marketplaces"),
                        ("Codex 插件", "codex_plugins"), ("Codex marketplace", "codex_marketplaces")):
         lines.extend(f"- {label} `{name}`：在新机器重新安装。" for name in inventory[key])

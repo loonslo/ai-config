@@ -1,8 +1,75 @@
 import importlib.util
 import json
 from pathlib import Path
+import pytest
 
 from test_machine_preflight import fixture_bundle
+
+
+@pytest.mark.parametrize('as_json', [False, True])
+@pytest.mark.parametrize('override', [False, True])
+def test_expert_cli_full_lifecycle_output_hygiene(tmp_path, monkeypatch, capsys, as_json, override):
+    import scripts.machine as cli
+    import sync_core.machine.apply as apply_module
+    import sync_core.machine.undo as undo_module
+    from sync_core.machine.bundle import read_bundle
+
+    email = 'person@example.org'
+    sample = 'sk-' + 'A' * 32
+    source = tmp_path / email / 'source'
+    target = tmp_path / email / 'target'
+    for home in (source, target):
+        (home / '.codex').mkdir(parents=True)
+    payload = ('Contact ' + email + '\nFixture ' + sample + '\n').encode()
+    (source / '.codex/AGENTS.md').write_bytes(payload)
+    output = tmp_path / email / 'output'
+    output.mkdir()
+    config = tmp_path / 'config.json'
+    config.write_text(json.dumps({'allow_secret_hit_paths':
+        [str(source / '.codex/AGENTS.md'), str(target / '.codex/AGENTS.md')] if override else []}), encoding='utf-8')
+    current = [source]
+    monkeypatch.setattr(Path, 'home', classmethod(lambda cls: current[0]))
+    monkeypatch.setattr(cli, 'default_state_path', lambda **kwargs: target / 'state')
+    monkeypatch.setattr(cli, 'software_inventory', lambda **kwargs: {'versions': {}})
+    original_backup = cli.prepare_backup
+    monkeypatch.setattr(cli, 'prepare_backup', lambda **kwargs: original_backup(
+        **kwargs, environ={}, software={'versions': {}}, git_keys=[], user_environment={}))
+    original_preflight = cli.preflight
+    monkeypatch.setattr(cli, 'preflight', lambda *args, **kwargs: original_preflight(
+        *args, **kwargs, environ={}, processes=[]))
+    monkeypatch.setattr(apply_module, 'running_apps', lambda *args, **kwargs: [])
+    monkeypatch.setattr(undo_module, 'running_apps', lambda *args, **kwargs: [])
+    flag = ['--json'] if as_json else []
+
+    def run(arguments, expected):
+        assert cli.main([*arguments, *flag]) == expected
+        captured = capsys.readouterr()
+        assert email not in captured.out + captured.err
+        assert sample not in captured.out + captured.err
+        if as_json:
+            return json.loads(captured.out)
+
+    backup = ['backup', '--config', str(config), '--out', str(output), '--agents', 'codex']
+    run(backup, 3)
+    assert list(output.iterdir()) == []
+    run([*backup, '--apply'], 0)
+    bundle, = output.glob('*.zip')
+    manifest, files = read_bundle(bundle)
+    expected = payload if override else payload.replace(sample.encode(), b'<REDACTED>')
+    assert files['files/codex/main/AGENTS.md'] == expected
+    assert manifest['schema_version'] == 2
+    current[0] = target
+    common = ['--bundle', str(bundle), '--config', str(config), '--agents', 'codex']
+    run(['preflight', *common], 3)
+    run(['restore', *common], 3)
+    assert not (target / '.codex/AGENTS.md').exists()
+    run(['restore', *common, '--apply'], 0)
+    assert (target / '.codex/AGENTS.md').read_bytes() == expected
+    run(['verify', *common], 0)
+    run(['undo', '--index', '1'], 3)
+    run(['undo', '--index', '1', '--apply'], 0)
+    assert not (target / '.codex/AGENTS.md').exists()
+    assert (source / '.codex/AGENTS.md').read_bytes() == payload
 
 
 def test_expert_cli_preview_apply_verify_undo_in_isolated_home(tmp_path,monkeypatch,capsys):

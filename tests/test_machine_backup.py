@@ -35,6 +35,7 @@ def test_backup_preview_zero_writes_apply_valid_and_stable_content(tmp_path):
     assert report["mode"] == "applied" and len(report["sha256"]) == 64
     assert_no_sentinel(plans[0].writer.destination)
     manifest, files = read_bundle(plans[0].writer.destination)
+    assert files['files/codex/main/skills/diary/icon.bin'] == b'\x00\xffsafe-icon'
     assert {"reports/projects.json", "reports/software.json", "reports/reinstall.json",
             "reports/reinstall.md", "reports/login-checklist.md", "reports/summary.md"} <= set(files)
     assert manifest["projects"]

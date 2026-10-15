@@ -16,6 +16,7 @@ from typing import Any, Iterable, Mapping
 
 from .transaction import PlannedChanges, SyncLock, transaction, write_file
 from .utils import atomic_write, digest, json_bytes, read_bytes
+from .streaming import StreamContent, content_digest, file_digest
 
 
 class RestoreError(RuntimeError):
@@ -128,8 +129,9 @@ def plan_restore(state_dir: Path, operation: Mapping[str, Any]) -> PlannedChange
     # ``wrote`` maps a path to the digest of the content this operation wrote, so
     # a later edit can be told apart from the version we are expecting.
     wrote = {str(item.get("path")): item.get("sha256") for item in operation.get("changes", [])}
+    streamed = {Path(item['path']) for item in operation.get('changes',[]) if item.get('streamed')}
 
-    changes: dict[Path, bytes | None] = {}
+    changes: dict[Path, bytes | None | StreamContent] = {}
     expected: dict[Path, str | None] = {}
     conflicts: list[str] = []
     for record in records:
@@ -139,11 +141,12 @@ def plan_restore(state_dir: Path, operation: Mapping[str, Any]) -> PlannedChange
             stored_path = backup / str(record["file"])
             if not stored_path.exists():
                 raise RestoreError(f"备份内容缺失，无法安全恢复：{target}")
-            stored = stored_path.read_bytes()
-            if digest(stored) != record.get("sha256"):
+            stored = StreamContent.from_path(stored_path,record['sha256'],record['size'],new_only=False) if target in streamed else stored_path.read_bytes()
+            stored_hash = file_digest(stored_path) if target in streamed else digest(stored)
+            if stored_hash != record.get("sha256"):
                 raise RestoreError(f"备份内容与清单哈希不符，拒绝恢复：{target}")
-        current = read_bytes(target)
-        current_hash = digest(current)
+        current = None if target in streamed else read_bytes(target)
+        current_hash = file_digest(target) if target in streamed else digest(current)
         # The target may hold either the version we wrote or the version the
         # backup captured. Anything else is a later user edit and is surfaced
         # rather than silently overwritten.
@@ -154,7 +157,8 @@ def plan_restore(state_dir: Path, operation: Mapping[str, Any]) -> PlannedChange
         if current_hash not in acceptable:
             conflicts.append(str(target))
             continue
-        if current != stored:
+        different = current_hash != content_digest(stored) if target in streamed else current != stored
+        if different:
             changes[target] = stored
         expected[target] = current_hash
     if conflicts:
@@ -166,7 +170,7 @@ def plan_restore(state_dir: Path, operation: Mapping[str, Any]) -> PlannedChange
         changes,
         expected=expected,
         state_root=state_dir,
-        metadata={"operation": "config", "restored_operation": operation.get("operation_id")},
+        metadata={"operation": "config", "restored_operation": operation.get("operation_id"), **({'stream_paths':sorted(str(p) for p in streamed)} if streamed else {})},
     )
 
 

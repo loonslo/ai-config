@@ -12,18 +12,19 @@ import uuid
 from typing import Any, Callable, Iterator, Mapping
 
 from .utils import atomic_write, digest, json_bytes, process_is_alive, read_bytes
+from .streaming import StreamContent, content_digest, file_digest, write_stream, no_links
 
 
 class SyncBusyError(RuntimeError):
     """Another sync operation is currently using this device state."""
 
 
-class PlannedChanges(dict[Path, bytes | None]):
+class PlannedChanges(dict[Path, bytes | None | StreamContent]):
     """A dict-compatible write plan carrying the read-time consistency boundary."""
 
     def __init__(
         self,
-        changes: Mapping[Path, bytes | None] = (),
+        changes: Mapping[Path, bytes | None | StreamContent] = (),
         *,
         expected: Mapping[Path, str | None] | None = None,
         expected_trees: Mapping[Path, Mapping[str, str]] | None = None,
@@ -35,6 +36,14 @@ class PlannedChanges(dict[Path, bytes | None]):
         self.expected_trees = {Path(path): dict(value) for path, value in (expected_trees or {}).items()}
         self.state_root = state_root
         self.metadata = dict(metadata or {})
+
+
+def _stream_paths(plan: PlannedChanges) -> set[Path]:
+    return {Path(p) for p in plan.metadata.get('stream_paths',[])} | {p for p,v in plan.items() if isinstance(v,StreamContent)}
+
+
+def _current_hash(path: Path, streamed: set[Path]) -> str | None:
+    return file_digest(path) if path in streamed else digest(read_bytes(path))
 
 
 def _now() -> str:
@@ -124,7 +133,7 @@ def _write_journal(path: Path, journal: dict[str, Any]) -> None:
     atomic_write(path, json_bytes(journal))
 
 
-def _backup_originals(originals: Mapping[Path, bytes | None], backup_root: Path, operation_id: str) -> tuple[Path, list[dict[str, Any]]]:
+def _backup_originals(originals: Mapping[Path, bytes | None | StreamContent], backup_root: Path, operation_id: str) -> tuple[Path, list[dict[str, Any]]]:
     backup = backup_root / operation_id
     backup.mkdir(parents=True, exist_ok=False)
     records: list[dict[str, Any]] = []
@@ -133,19 +142,23 @@ def _backup_originals(originals: Mapping[Path, bytes | None], backup_root: Path,
             "path": str(path),
             "file": str(index),
             "existed": data is not None,
-            "sha256": digest(data),
-            "size": len(data) if data is not None else 0,
+            "sha256": content_digest(data),
+            "size": data.size if isinstance(data,StreamContent) else len(data) if data is not None else 0,
         }
         records.append(record)
         if data is not None:
-            (backup / str(index)).write_bytes(data)
+            if isinstance(data,StreamContent):
+                write_stream(backup/str(index),data)
+            else:
+                (backup / str(index)).write_bytes(data)
     atomic_write(backup / "manifest.json", json_bytes(records))
     return backup, records
 
 
 def _verify_plan(plan: PlannedChanges, expected: Mapping[Path, str | None]) -> None:
+    streamed = _stream_paths(plan)
     for path, expected_hash in expected.items():
-        if digest(read_bytes(path)) != expected_hash:
+        if _current_hash(path,streamed) != expected_hash:
             raise ValueError(f"Plan invalidated by a newer change: {path}")
     for root, tree in plan.expected_trees.items():
         if _tree_state(root) != tree:
@@ -153,13 +166,13 @@ def _verify_plan(plan: PlannedChanges, expected: Mapping[Path, str | None]) -> N
 
 
 def transaction(
-    changes: Mapping[Path, bytes | None],
+    changes: Mapping[Path, bytes | None | StreamContent],
     backup_root: Path,
     *,
     state_root: Path | None = None,
     operation_id: str | None = None,
     lock: bool = True,
-    writer: Callable[[Path, bytes | None], None] | None = None,
+    writer: Callable[[Path, bytes | None | StreamContent], None] | None = None,
 ) -> Path | None:
     """Apply a planned batch with a journal and recoverable backup.
 
@@ -168,6 +181,9 @@ def transaction(
     consistency boundary starts when this function is called.
     """
     plan = changes if isinstance(changes, PlannedChanges) else PlannedChanges(changes)
+    streamed = _stream_paths(plan)
+    if streamed:
+        plan.metadata['stream_paths'] = sorted(str(p) for p in streamed)
     write = writer or write_file
     state = state_root or plan.state_root or backup_root.parent
     operation = operation_id or uuid.uuid4().hex
@@ -176,8 +192,17 @@ def transaction(
         pending = recover_transactions(state)
         if any(item.get("status") in {"PREPARED", "APPLYING", "INTERRUPTED", "ROLLBACK_REQUIRED", "INVALID_JOURNAL"} for item in pending):
             raise RuntimeError("Unfinished transaction requires recovery before applying changes")
-        originals = {path: read_bytes(path) for path in plan}
-        expected = {path: digest(data) for path, data in originals.items()}
+        originals = {}
+        for path,data in plan.items():
+            if path not in streamed:
+                originals[path] = read_bytes(path)
+                continue
+            no_links(path)
+            if isinstance(data,StreamContent) and data.new_only and path.exists():
+                raise ValueError('stream target already exists')
+            prior = file_digest(path)
+            originals[path] = None if prior is None else StreamContent.from_path(path,prior,path.stat().st_size)
+        expected = {path: content_digest(data) for path, data in originals.items()}
         expected.update(plan.expected)
         _verify_plan(plan, expected)
         backup, records = _backup_originals(originals, backup_root, operation)
@@ -188,7 +213,7 @@ def transaction(
             "status": "PREPARED",
             "backup": str(backup),
             "records": records,
-            "changes": [{"path": str(path), "sha256": digest(data), "delete": data is None} for path, data in plan.items()],
+            "changes": [{"path": str(path), "sha256": content_digest(data), "delete": data is None, **({'streamed': True} if path in streamed else {})} for path, data in plan.items()],
             "metadata": plan.metadata,
             "created_at": _now(),
         }
@@ -200,9 +225,11 @@ def transaction(
             journal["status"] = "APPLYING"
             _write_journal(journal_path, journal)
             for current, data in plan.items():
-                if digest(read_bytes(current)) != expected[current]:
+                if _current_hash(current,streamed) != expected[current]:
                     raise ValueError(f"Plan invalidated by a newer change: {current}")
                 write(current, data)
+                if current in streamed and _current_hash(current,streamed) != content_digest(data):
+                    raise ValueError('stream write verification failed')
                 completed.append(current)
             journal["status"] = "COMMITTED"
             _write_journal(journal_path, journal)
@@ -210,22 +237,27 @@ def transaction(
         except BaseException as error:
             if isinstance(error, Exception):
                 rollback_paths = list(completed)
+                partial_conflicts: list[str] = []
                 if current is not None and current not in rollback_paths:
                     try:
-                        if digest(read_bytes(current)) == digest(plan[current]):
+                        actual = _current_hash(current,streamed)
+                        if actual == content_digest(plan[current]):
                             rollback_paths.append(current)
+                        elif current in streamed and actual != expected[current]:
+                            partial_conflicts.append(str(current))
                     except OSError:
                         pass
-                conflicts: list[str] = []
+                conflicts: list[str] = partial_conflicts
                 by_path = {record["path"]: record for record in records}
                 for path in reversed(rollback_paths):
-                    if digest(read_bytes(path)) != digest(plan[path]):
+                    if _current_hash(path,streamed) != content_digest(plan[path]):
                         conflicts.append(str(path))
                         continue
                     original = by_path[str(path)]
                     data = None
                     if original["existed"]:
-                        data = (backup / original["file"]).read_bytes()
+                        source=backup/original['file']
+                        data = StreamContent.from_path(source,original['sha256'],original['size'],new_only=False) if path in streamed else source.read_bytes()
                     write(path, data)
                 journal["status"] = "ROLLBACK_REQUIRED" if conflicts else "ROLLED_BACK"
                 if conflicts:
@@ -237,7 +269,10 @@ def transaction(
             raise
 
 
-def write_file(path: Path, data: bytes | None) -> None:
+def write_file(path: Path, data: bytes | None | StreamContent) -> None:
+    if isinstance(data,StreamContent):
+        write_stream(path,data)
+        return
     if data is None:
         if path.is_symlink():
             raise ValueError(f"Symlink requires manual migration: {path}")
@@ -275,13 +310,16 @@ def recover_transactions(state_root: Path, *, action: str = "status") -> list[di
                 backup = Path(journal["backup"])
                 records = {record["path"]: record for record in json.loads((backup / "manifest.json").read_text(encoding="utf-8"))}
                 changes = {item["path"]: item for item in journal.get("changes", [])}
+                streamed = {Path(name) for name,item in changes.items() if item.get('streamed')}
                 for name, item in records.items():
                     target = Path(name)
-                    if digest(read_bytes(target)) != item.get("sha256") and digest(read_bytes(target)) != changes.get(name, {}).get("sha256"):
+                    current_hash = _current_hash(target,streamed)
+                    if current_hash != item.get("sha256") and current_hash != changes.get(name, {}).get("sha256"):
                         conflicts.append(name)
                         continue
-                    data = (backup / item["file"]).read_bytes() if item["existed"] else None
-                    if digest(data) != item.get("sha256"):
+                    source=backup/item['file']
+                    data = (StreamContent.from_path(source,item['sha256'],item['size'],new_only=False) if target in streamed else source.read_bytes()) if item['existed'] else None
+                    if content_digest(data) != item.get("sha256") or isinstance(data,StreamContent) and file_digest(source) != item['sha256']:
                         conflicts.append(name)
                         continue
                     write_file(target, data)

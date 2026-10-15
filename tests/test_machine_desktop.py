@@ -55,13 +55,17 @@ def test_restore_conflicts_verification_history_and_undo(tmp_path):
     params = {'bundle': str(bundle), 'agents': ['codex', 'claude'],
               'root_map': [{'from': old, 'to': new} for old, new in mapper.rules]}
     plan = preview(protocol, 'machine_restore', **params)
+    assert not plan['can_apply'] and 'plan_id' not in plan, plan
+    params['conflict_choices'] = {item['entry_id']: 'keep' for item in plan['result']['conflicts']}
+    plan = preview(protocol, 'machine_restore', **params)
     assert plan['can_apply'], plan
     assert plan['result']['source_projects']
     assert_tree_unchanged(before, home)
     result = apply(protocol, plan)
     assert result['status'] == 'applied', result
     assert target.read_text() == 'Keep local rules.\n'
-    assert target.with_name('AGENTS.md.from-bundle').exists()
+    assert not target.with_name('AGENTS.md.from-bundle').exists()
+    assert any(item['status'] == 'KEPT' for item in result['result']['verification']['checks'])
     assert not any(v['status'] == 'FAIL' for v in result['result']['verification']['checks'])
     history = preview(protocol, 'machine_history')['result']['operations']
     assert len(history) == 1

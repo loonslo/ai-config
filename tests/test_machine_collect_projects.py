@@ -76,16 +76,17 @@ def test_core_folders_remain_distinct_when_they_share_a_git_root(tmp_path):
     result = collect_projects(writer, home=paths["home"], config=config, environ={}, os_name="windows")
     assert len(result.projects) == 2
     assert len({item["project_id"] for item in result.projects}) == 2
-    assert len({item["git_root_id"] for item in result.projects}) == 1
+    assert all('git_root' not in item and 'git_root_id' not in item for item in result.projects)
 
 
-def test_local_permissions_with_secret_are_not_copied(tmp_path):
+def test_local_permissions_with_secret_are_redacted(tmp_path):
     paths = build_machine_home(tmp_path / "home")
     local = paths["project"] / ".claude" / "settings.local.json"
     local.write_text(json.dumps({"permissions": {"allow": ["password: " + "x" * 24]}}), encoding="utf-8")
     writer = BundleWriter(tmp_path / "secret-permissions.zip")
     result = collect_projects(writer, home=paths["home"], config=_config(tmp_path, paths), environ={}, os_name="windows")
     writer.finalize(projects=result.projects, warnings=result.warnings)
-    assert result.local_files == 0
-    assert any(item["code"] == "E7203" for item in result.warnings)
+    assert result.local_files == 1
+    assert any(item["action"] == "redacted" for item in writer.flagged)
+    assert all(("x" * 24).encode() not in data for data in writer._files.values())
     assert_no_sentinel(tmp_path / "secret-permissions.zip")

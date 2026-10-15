@@ -75,8 +75,8 @@ def guide_backup(*, io: GuideIO | None = None, home: Path | None = None,
         selected_config = config or load_config(location, home=user_home, source_os=system)
         used = location.is_file() if config_used is None else config_used
         roots = agent_roots(user_home, selected_config, env)
-        detected = [name for name in AGENT_LABELS if roots[name].is_dir() and not roots[name].is_symlink()]
-        for name in AGENT_LABELS:
+        detected = [name for name in roots if roots[name].is_dir() and not roots[name].is_symlink()]
+        for name in roots:
             if name not in detected:
                 ui.say(f"{AGENT_LABELS[name]}：未找到，已跳过。")
         if not detected:

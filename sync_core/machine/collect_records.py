@@ -55,8 +55,7 @@ def software_inventory(*, run: Run = run_version_command, link_probe: Callable[[
     """Return only version numbers, package names and availability facts."""
     commands: dict[str, tuple[str, ...]] = {
         "node": ("node", "--version"), "npm": ("npm", "--version"),
-        "python": ("python", "--version"), "git": ("git", "--version"),
-        "git_lfs": ("git", "lfs", "version"), "uv": ("uv", "--version"),
+        "python": ("python", "--version"), "uv": ("uv", "--version"),
         "pnpm": ("pnpm", "--version"), "cargo": ("cargo", "--version"),
         "rustc": ("rustc", "--version"), "codex_cli": ("codex", "--version"),
     }

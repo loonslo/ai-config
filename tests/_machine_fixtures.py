@@ -36,7 +36,9 @@ def build_machine_home(home: Path) -> dict[str, Path]:
     (home / ".codex" / "config.toml").write_text(
         'model_reasoning_effort = "high"\n[shell_environment_policy.set]\nTEST_SECRET = "' + SENTINEL + '"\n'
         + "[projects.'" + native.replace("\\", "/").lower() + "']\ntrust_level = \"trusted\"\n", encoding="utf-8")
-    (home / ".codex" / "skills" / "diary" / "icon.bin").write_bytes(b"\x00\xff" + SENTINEL.encode())
+    # SK-01 now carries binary assets. Keep credential/runtime sentinels in
+    # protected sources; an allowed image asset is not a credential decoy.
+    (home / ".codex" / "skills" / "diary" / "icon.bin").write_bytes(b"\x00\xffsafe-icon")
     db = home / ".codex" / "state_5.sqlite"
     with closing(sqlite3.connect(db)) as connection, connection:
         connection.executescript("CREATE TABLE projects(id TEXT, name TEXT); CREATE TABLE project_roots(project_id TEXT, path TEXT); CREATE TABLE threads(id TEXT, cwd TEXT);")

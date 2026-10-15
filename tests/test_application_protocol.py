@@ -633,7 +633,7 @@ def test_desktop_rpc_entrypoint_uses_utf8_json_lines_without_writing_preview(tmp
     assert events[0]["type"] == "accepted"
     assert events[-1]["status"] == "preview"
     assert events[-1]["can_apply"] is False
-    assert len(events[-1]["result"]["agents"]) == 4
+    assert {agent['id'] for agent in events[-1]['result']['agents']} == {'claude','codex','shared','workbuddy','workbuddy-ai'}
     assert not target.exists()
 
 

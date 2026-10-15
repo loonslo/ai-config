@@ -32,10 +32,10 @@ def test_git_root_primary_checkout_and_plain_folder(tmp_path, monkeypatch):
     subprocess.run(["git", "-C", str(repo), "-c", "user.email=x@example.invalid", "-c", "user.name=X", "commit", "--allow-empty", "-qm", "init"], check=True)
     nested = repo / "nested"
     nested.mkdir()
-    assert git_root(nested) == repo.resolve()
+    assert git_root(nested) == nested.resolve()
     worktree = tmp_path / "other"
     subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "test-worktree", str(worktree)], check=True)
-    assert git_root(worktree) == repo.resolve()
+    assert git_root(worktree) == worktree.resolve()
     plain = tmp_path / "plain"
     plain.mkdir()
     def no_git(*args, **kwargs):

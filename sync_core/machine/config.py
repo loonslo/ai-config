@@ -21,7 +21,7 @@ DEFAULT_EXCLUDES = (
 DEFAULT_PROCESSES = ("Claude.exe", "Codex.exe", "WorkBuddy.exe", "WorkBuddy AI.exe", "claude", "codex", "workbuddy", "workbuddy ai")
 _KEYS = frozenset({
     "core_projects", "exclude_patterns", "root_map", "instances",
-    "include_desktop_fields", "allow_secret_hit_paths", "running_process_names",
+    "include_desktop_fields", "allow_secret_hit_paths", "running_process_names", "env_include",
 })
 
 
@@ -34,6 +34,7 @@ class MachineConfig:
     include_desktop_fields: frozenset[str]
     allow_secret_hit_paths: frozenset[Path]
     running_process_names: tuple[str, ...]
+    env_include: frozenset[str] = frozenset()
 
 
 def excluded_path(path: Path, *, config: MachineConfig, home: Path, os_name: str,
@@ -113,4 +114,8 @@ def load_config(path: Path | None = None, *, home: Path | None = None, source_os
         raise ValueError("unsupported Codex desktop field")
     secrets = frozenset(_path(value) for value in _list(data.get("allow_secret_hit_paths", []), "allow_secret_hit_paths"))
     processes = tuple(_list(data.get("running_process_names", list(DEFAULT_PROCESSES)), "running_process_names"))
-    return MachineConfig(projects, excludes, root_map, instances, desktop, secrets, processes)
+    env_include = frozenset(_list(data.get("env_include", []), "env_include"))
+    import re
+    if any(not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', key) for key in env_include):
+        raise ValueError("invalid env_include name")
+    return MachineConfig(projects, excludes, root_map, instances, desktop, secrets, processes, env_include)

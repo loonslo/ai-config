@@ -7,6 +7,7 @@ from typing import Any,Iterable
 
 from sync_core.restore import recent_operations,select_operation,plan_restore
 from sync_core.transaction import transaction,write_file
+from sync_core.streaming import StreamContent, content_digest, file_digest
 
 from .bundle import BundleError
 from .preflight import no_links,target_bytes
@@ -54,7 +55,7 @@ def prepare_undo(state: Path, *, index: int | None=None, operation_id: str | Non
             raise BundleError('invalid undo backup record')
         no_links(backup/str(record['file']))
     plan=plan_restore(state,selected)
-    plan.metadata={'operation':'machine_undo','restored_operation':operation_id,
+    plan.metadata={**plan.metadata,'operation':'machine_undo','restored_operation':operation_id,
                    'path_agents':metadata.get('path_agents',{}),'path_boundaries':metadata.get('path_boundaries',{})}
     return selected,plan,boundaries
 
@@ -75,7 +76,9 @@ def undo(state: Path, *, index: int | None=None, operation_id: str | None=None, 
         if running_apps(process_names,processes=processes):
             raise BundleError('target application started during undo')
         write_file(path,data)
-        if target_bytes(path)!=data:
+        streamed = str(path) in plan.metadata.get('stream_paths',[]) or isinstance(data,StreamContent)
+        different = file_digest(path) != content_digest(data) if streamed else target_bytes(path) != data
+        if different:
             raise BundleError('undo verification failed')
     transaction(plan,state/'backups',state_root=state,writer=guarded)
     return {**report,'mode':'applied'}

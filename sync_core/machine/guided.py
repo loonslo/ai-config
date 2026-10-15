@@ -10,11 +10,29 @@ from typing import Callable, Sequence
 import uuid
 
 
-AGENT_LABELS = {"claude": "Claude", "codex": "Codex", "workbuddy": "WorkBuddy", "workbuddy-ai": "WorkBuddy AI"}
+AGENT_LABELS = {"claude": "Claude", "codex": "Codex", "workbuddy": "WorkBuddy", "workbuddy-ai": "WorkBuddy AI",
+                "shared": "通用技能", "system": "环境变量"}
 KIND_LABELS = {"rules": "规则", "settings_fields": "设置", "permissions_local": "已批准的操作",
-               "persona": "人设", "skills_text": "技能", "memory": "记忆", "trust_fields": "信任的文件夹"}
-REASON_LABELS = {"secret_hit": "可能含密码或私人信息", "non_text": "不是文本", "too_large": "文件过大",
+               "persona": "人设", "skills_text": "技能", "memory": "记忆", "trust_fields": "信任的文件夹",
+               "approvals": "已批准的操作", "skills": "技能", "customizations": "自建指令",
+               "scripts": "自写脚本", "plans": "计划笔记", "env_fields": "环境变量", "history_files": "历史记录"}
+REASON_LABELS = {"secret_hit": "命中密钥特征，按你的选择跳过", "skipped_by_policy": "隐藏密钥后格式无法解析，已跳过",
+                 "build_artifact": "可重新生成的程序文件", "path_too_long": "文件路径过长",
+                 "non_text": "不是文本", "too_large": "文件过大",
                  "excluded_by_config":"按你的选择排除"}
+RESTORE_REASON_LABELS = {
+    'group_not_selected':'本次未选择这类内容',
+    'redacted': '里面的密钥已被隐藏，请重新填写',
+    'exported': '已导出到恢复报告文件夹，请自行导入',
+    'needs_rebuild': '缺少可重新生成的程序文件，请按来源重装',
+    'link_blocked': '目标文件夹被链接接管，已跳过',
+    'manual_trust':'需要在 Claude 中手动确认项目信任','manual_workbuddy':'未选择复制 WorkBuddy 文本',
+    'security_not_confirmed':'未确认模型与安全设置','trust_not_confirmed':'未确认 Codex 项目信任',
+    'kept_local':'按你的选择保留本机内容','memory_not_selected':'未选择恢复记忆',
+    'agent_not_initialized':'助手目录未初始化','project_missing':'工作文件夹不存在',
+    'unsafe_target':'目标路径含链接或无法安全读取','agent_not_selected':'本次未选择这个助手',
+    'alternate_already_differs':'已有另存副本内容不同',
+}
 _ENGLISH = re.compile(r"(?i)(?<![A-Za-z0-9_])(?:bundle|agent|instance|profile|preflight|dry-run|apply|undo|rules|settings_fields|permissions_local|persona|skills_text|memory|trust|trust_fields|orphan|dead_path|root-map|project_id|content_id|sha256|manifest|schema|tier|journal|state|store)(?![A-Za-z0-9_])")
 _CHINESE = ("迁移包", "预检", "预览", "孤儿", "映射", "设备 ID", "档", "事务")
 

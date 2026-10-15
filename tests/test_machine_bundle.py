@@ -121,7 +121,7 @@ def test_rejects_abnormal_compression_ratio(tmp_path):
 
 
 @pytest.mark.parametrize("mutate", [
-    lambda m: m.update(schema_version=2),
+    lambda m: m.update(schema_version=3),
     lambda m: m.update(unknown=True),
     lambda m: m["entries"][0].update(sha256="0" * 64),
     lambda m: m["entries"][0].update(size=0),
