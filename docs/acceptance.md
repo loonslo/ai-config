@@ -908,3 +908,5 @@ OF-12 交付自检（2026-10-11）：scripts/check-secrets.ps1 为 0 findings，
 Windows / Python 3.14：完整 pytest 使用全新 tmp/audit-20261015-02，735 passed、3 skipped（321.80 秒）；桌面 TypeScript/Vite 构建和 oxlint 通过，scripts/check-secrets.ps1 为 0 findings。首次使用旧 .venv 的 Python 3.13 时因缺 jsonschema 在收集阶段失败，改用已具备依赖的 Python 3.14 后通过；未改全局依赖。
 
 本次提交既有 0.3.7 分类、历史恢复、隐私和桌面布局改动。公开远程历史与本地旧历史树一致但根提交不同，因此保留 backup/pre-sync-20261015，将新提交接到远程历史，避免公开旧历史；无强制推送。当前产品为离线桌面工具，无生产服务器部署。未重建 NSIS、安装升级或真实跨机验收；不把前端构建当作原生发布。
+
+2026-10-15 推送后 CI 发现 requirements-test.txt 漏声明既有测试导入的 jsonschema；已加入测试依赖范围（4.x），不加入运行依赖。完整本机回归仍以 735/3 为本次证据；推送后另核对跨平台工作流。
